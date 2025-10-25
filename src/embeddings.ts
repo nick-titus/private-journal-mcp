@@ -3,7 +3,6 @@
 
 import { pipeline, FeatureExtractionPipeline } from '@xenova/transformers';
 import * as fs from 'fs/promises';
-import * as path from 'path';
 
 export interface EmbeddingData {
   embedding: number[];
