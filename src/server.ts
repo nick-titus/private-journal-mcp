@@ -8,7 +8,6 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { JournalManager } from './journal';
-import { ProcessFeelingsRequest, ProcessThoughtsRequest } from './types';
 import { SearchService } from './search';
 
 export class PrivateJournalServer {

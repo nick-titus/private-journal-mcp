@@ -3,7 +3,6 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { JournalEntry } from './types';
 import { resolveUserJournalPath } from './paths';
 import { EmbeddingService, EmbeddingData } from './embeddings';
 
@@ -277,7 +276,7 @@ ${sections.join('\n\n')}
   private async ensureDirectoryExists(dirPath: string): Promise<void> {
     try {
       await fs.access(dirPath);
-    } catch (error) {
+    } catch (_error) {
       try {
         await fs.mkdir(dirPath, { recursive: true });
       } catch (mkdirError) {
