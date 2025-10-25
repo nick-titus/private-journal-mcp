@@ -3,8 +3,8 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { resolveUserJournalPath } from './paths';
-import { EmbeddingService, EmbeddingData } from './embeddings';
+import { resolveUserJournalPath } from './paths.js';
+import { EmbeddingService, EmbeddingData } from './embeddings.js';
 
 export class JournalManager {
   private projectJournalPath: string;
