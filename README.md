@@ -48,6 +48,28 @@ Add to your MCP settings (e.g., Claude Desktop configuration):
 
 The server will automatically find a suitable location for the journal files.
 
+## Local Development Installation
+
+Use a local build to test changes:
+
+1. Build the project:
+```bash
+npm run build
+```
+
+2. Add to Claude Code:
+```bash
+claude mcp add-json private-journal \
+'{"type":"stdio","command":"node","args":["/path/to/private-journal-mcp/dist/index.js"]}' \
+-s user
+```
+
+Adjust paths for your environment:
+- **Node path**: Use `which node` to find your Node.js installation (e.g., `/opt/homebrew/bin/node`)
+- **Repository path**: Replace `/path/to/private-journal-mcp` with your absolute path to the cloned repository
+
+This replaces the npx installation with your local build.
+
 ## MCP Tools
 
 The server provides comprehensive journaling and search capabilities:
