@@ -57,16 +57,16 @@ Use a local build to test changes:
 npm run build
 ```
 
-2. Add to Claude Code:
+2. Add to Claude Code (run from repository root):
 ```bash
 claude mcp add-json private-journal \
-'{"type":"stdio","command":"node","args":["/path/to/private-journal-mcp/dist/index.js"]}' \
+'{"type":"stdio","command":"node","args":["'$(pwd)'/dist/index.js"]}' \
 -s user
 ```
 
 Adjust paths for your environment:
-- **Node path**: Use `which node` to find your Node.js installation (e.g., `/opt/homebrew/bin/node`)
-- **Repository path**: Replace `/path/to/private-journal-mcp` with your absolute path to the cloned repository
+- **Run from repo root**: This command must be run from the root of the cloned repository
+- **Node path**: If `node` is not in your shell's `PATH`, replace `"node"` in the command's JSON payload with the absolute path from `which node` (e.g., `/opt/homebrew/bin/node`)
 
 This replaces the npx installation with your local build.
 
