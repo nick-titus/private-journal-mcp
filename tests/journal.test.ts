@@ -168,9 +168,9 @@ describe('JournalManager', () => {
   });
 
   describe('writeThoughts with new schema', () => {
-    test('writes entry with nick section', async () => {
+    test('writes entry with user section', async () => {
       await journalManager.writeThoughts({
-        nick: 'Prefers concise communication, values explicit control'
+        user: 'Prefers concise communication, values explicit control'
       });
 
       const today = new Date();
@@ -184,7 +184,7 @@ describe('JournalManager', () => {
       expect(mdFile).toBeDefined();
       const content = await fs.readFile(path.join(dayDir, mdFile!), 'utf8');
 
-      expect(content).toContain('## Nick');
+      expect(content).toContain('## User');
       expect(content).toContain('Prefers concise communication, values explicit control');
     });
 
@@ -224,7 +224,7 @@ describe('JournalManager', () => {
 
     test('writes all sections when provided', async () => {
       await journalManager.writeThoughts({
-        nick: 'Likes TypeScript strict mode',
+        user: 'Likes TypeScript strict mode',
         project: 'Uses centralized state management',
         reflections: 'Good progress today'
       });
@@ -236,7 +236,7 @@ describe('JournalManager', () => {
       const mdFile = files.find(f => f.endsWith('.md'));
       const content = await fs.readFile(path.join(dayDir, mdFile!), 'utf8');
 
-      expect(content).toContain('## Nick');
+      expect(content).toContain('## User');
       expect(content).toContain('Likes TypeScript strict mode');
       expect(content).toContain('## Project');
       expect(content).toContain('Uses centralized state management');
@@ -247,7 +247,7 @@ describe('JournalManager', () => {
     test('writes to centralized location regardless of section type', async () => {
       // All entries should go to the centralized location
       await journalManager.writeThoughts({
-        nick: 'User context data'
+        user: 'User context data'
       });
 
       await journalManager.writeThoughts({
@@ -266,7 +266,7 @@ describe('JournalManager', () => {
 
     test('includes project in embedding data', async () => {
       await journalManager.writeThoughts({
-        nick: 'Test embedding project field'
+        user: 'Test embedding project field'
       });
 
       const today = new Date();
@@ -299,7 +299,7 @@ timestamp: ${today.getTime()}
 project: test-project
 ---
 
-## Nick
+## User
 
 Test content for embedding generation
 `;

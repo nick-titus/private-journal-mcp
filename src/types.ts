@@ -8,7 +8,7 @@ export interface JournalEntry {
 }
 
 export interface ProcessThoughtsRequest {
-  nick?: string;         // Understanding Nick - preferences, values, style, domains
+  user?: string;         // Understanding the user - preferences, values, style, domains
   project?: string;      // Project learnings - architecture, decisions, gotchas
   reflections?: string;  // Session retrospective - what worked, what didn't
 }

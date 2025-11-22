@@ -14,7 +14,7 @@ describe('EmbeddingData schema', () => {
     const data: EmbeddingData = {
       embedding: [0.1, 0.2],
       text: 'test',
-      sections: ['nick'],
+      sections: ['user'],
       timestamp: Date.now(),
       path: '/test/path.md',
       project: 'betterpack'
@@ -26,7 +26,7 @@ describe('EmbeddingData schema', () => {
     const data: EmbeddingData = {
       embedding: [0.1, 0.2],
       text: 'test',
-      sections: ['nick'],
+      sections: ['user'],
       timestamp: Date.now(),
       path: '/test/path.md'
     };
@@ -88,9 +88,9 @@ timestamp: 1717056000000
 project: test-project
 ---
 
-## Nick
+## User
 
-Nick prefers explicit control over implicit behavior.
+User prefers explicit control over implicit behavior.
 
 ## Reflections
 
@@ -98,10 +98,10 @@ TypeScript interfaces are really powerful for maintaining code quality.`;
 
     const { text, sections } = embeddingService.extractSearchableText(markdown);
 
-    expect(text).toContain('Nick prefers explicit control over implicit behavior');
+    expect(text).toContain('User prefers explicit control over implicit behavior');
     expect(text).toContain('TypeScript interfaces are really powerful');
     expect(text).not.toContain('title: "Test Entry"');
-    expect(sections).toEqual(['Nick', 'Reflections']);
+    expect(sections).toEqual(['User', 'Reflections']);
   });
 
   test('cosine similarity calculation works correctly', async () => {
@@ -120,7 +120,7 @@ TypeScript interfaces are really powerful for maintaining code quality.`;
 
   test('journal manager generates embeddings when writing thoughts', async () => {
     const thoughts = {
-      nick: 'Nick prefers concise code and explicit control flow',
+      user: 'User prefers concise code and explicit control flow',
       reflections: 'Vector embeddings provide semantic understanding of text'
     };
 
@@ -146,7 +146,7 @@ TypeScript interfaces are really powerful for maintaining code quality.`;
       expect(embeddingData.embedding).toBeDefined();
       expect(Array.isArray(embeddingData.embedding)).toBe(true);
       expect(embeddingData.text).toContain('concise code');
-      expect(embeddingData.sections).toContain('Nick');
+      expect(embeddingData.sections).toContain('User');
       expect(embeddingData.sections).toContain('Reflections');
       expect(embeddingData.project).toBeDefined();
     }
@@ -155,7 +155,7 @@ TypeScript interfaces are really powerful for maintaining code quality.`;
   test('search service finds semantically similar entries', async () => {
     // Write some test entries with new section names
     await journalManager.writeThoughts({
-      nick: 'I feel frustrated with debugging TypeScript errors'
+      user: 'I feel frustrated with debugging TypeScript errors'
     });
 
     await journalManager.writeThoughts({
@@ -190,23 +190,23 @@ TypeScript interfaces are really powerful for maintaining code quality.`;
     });
 
     await journalManager.writeThoughts({
-      nick: 'I enjoy working with modern JavaScript frameworks'
+      user: 'I enjoy working with modern JavaScript frameworks'
     });
 
     await new Promise(resolve => setTimeout(resolve, 2000));
 
     // Search with section filter
     const projectResults = await searchService.search('React TypeScript', { sections: ['Project'] });
-    const nickResults = await searchService.search('React TypeScript', { sections: ['Nick'] });
+    const userResults = await searchService.search('React TypeScript', { sections: ['User'] });
 
     // Project results should contain entries with Project section
     if (projectResults.length > 0) {
       expect(projectResults[0].sections).toContain('Project');
     }
 
-    // Nick results should contain entries with Nick section
-    if (nickResults.length > 0) {
-      expect(nickResults[0].sections).toContain('Nick');
+    // User results should contain entries with User section
+    if (userResults.length > 0) {
+      expect(userResults[0].sections).toContain('User');
     }
   }, 90000);
 });

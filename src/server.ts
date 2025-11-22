@@ -36,7 +36,7 @@ export class PrivateJournalServer {
           description: `Write to your private journal. Use this to capture learnings and build context for future sessions.
 
 Sections:
-- nick: Understanding Nick - his preferences, values, communication style, domains (TrainingPeaks, cycling, TPV)
+- user: Understanding the user - their preferences, values, communication style, domain expertise
 - project: Project-specific learnings - architecture, decisions, gotchas, things tried and failed
 - reflections: Session retrospective - what worked, what didn't, what to do differently next time
 
@@ -44,9 +44,9 @@ Write to any combination of sections. Entries are automatically tagged with the 
           inputSchema: {
             type: 'object',
             properties: {
-              nick: {
+              user: {
                 type: 'string',
-                description: 'Observations about Nick - preferences, values, style, domain context',
+                description: 'Observations about the user - preferences, values, style, domain context',
               },
               project: {
                 type: 'string',
@@ -78,7 +78,7 @@ Write to any combination of sections. Entries are automatically tagged with the 
               sections: {
                 type: 'array',
                 items: { type: 'string' },
-                description: "Filter by sections: nick, project, reflections",
+                description: "Filter by sections: user, project, reflections",
               },
               project: {
                 type: 'string',
@@ -134,14 +134,14 @@ Write to any combination of sections. Entries are automatically tagged with the 
 
       if (request.params.name === 'process_thoughts') {
         const thoughts = {
-          nick: typeof args.nick === 'string' ? args.nick : undefined,
+          user: typeof args.user === 'string' ? args.user : undefined,
           project: typeof args.project === 'string' ? args.project : undefined,
           reflections: typeof args.reflections === 'string' ? args.reflections : undefined,
         };
 
         const hasAnyContent = Object.values(thoughts).some(value => value !== undefined);
         if (!hasAnyContent) {
-          throw new Error('At least one section must be provided (nick, project, or reflections)');
+          throw new Error('At least one section must be provided (user, project, or reflections)');
         }
 
         try {

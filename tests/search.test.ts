@@ -74,7 +74,7 @@ describe('SearchService with project filtering', () => {
       {
         embedding: [0.25, 0.35, 0.45, 0.55, 0.65],
         text: 'General observations about code quality',
-        sections: ['Nick'],
+        sections: ['User'],
         timestamp: Date.now() - 4000,
         path: path.join(dayPath, 'entry4.md'),
         project: 'general'
@@ -188,7 +188,7 @@ describe('SearchService with project filtering', () => {
         path: '/test/path.md',
         score: 0.9,
         text: 'test content',
-        sections: ['Nick'],
+        sections: ['User'],
         timestamp: Date.now(),
         excerpt: 'test excerpt',
         project: 'betterpack'
@@ -202,7 +202,7 @@ describe('SearchService with project filtering', () => {
         path: '/test/path.md',
         score: 0.9,
         text: 'test content',
-        sections: ['Nick'],
+        sections: ['User'],
         timestamp: Date.now(),
         excerpt: 'test excerpt',
         // project intentionally omitted

@@ -34,7 +34,7 @@ export class JournalManager {
   }
 
   async writeThoughts(thoughts: {
-    nick?: string;
+    user?: string;
     project?: string;
     reflections?: string;
   }): Promise<void> {
@@ -98,7 +98,7 @@ ${content}
   }
 
   private formatThoughts(thoughts: {
-    nick?: string;
+    user?: string;
     project?: string;
     reflections?: string;
   }, timestamp: Date, projectName: string): string {
@@ -116,8 +116,8 @@ ${content}
 
     const sections = [];
 
-    if (thoughts.nick) {
-      sections.push(`## Nick\n\n${thoughts.nick}`);
+    if (thoughts.user) {
+      sections.push(`## User\n\n${thoughts.user}`);
     }
 
     if (thoughts.project) {
