@@ -124,7 +124,7 @@ ${content}
     }
 
     if (thoughts.projectNotes) {
-      sections.push(`## Project\n\n${thoughts.projectNotes}`);
+      sections.push(`## Project Notes\n\n${thoughts.projectNotes}`);
     }
 
     if (thoughts.reflections) {

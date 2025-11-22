@@ -4,8 +4,8 @@
 import * as path from 'path';
 import { execSync } from 'child_process';
 
-// Regex to validate safe path characters (alphanumeric, slash, dash, underscore, dot, space)
-const SAFE_PATH_REGEX = /^[a-zA-Z0-9/_\-.\s]+$/;
+// Regex to validate safe path characters (alphanumeric, slash, dash, underscore, dot, space, colon, backslash for Windows)
+const SAFE_PATH_REGEX = /^[a-zA-Z0-9/_\-.\s:\\]+$/;
 
 /**
  * Validates that a path contains only safe characters

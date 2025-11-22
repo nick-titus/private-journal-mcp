@@ -196,12 +196,12 @@ TypeScript interfaces are really powerful for maintaining code quality.`;
     await new Promise(resolve => setTimeout(resolve, 2000));
 
     // Search with section filter
-    const { results: projectResults } = await searchService.search('React TypeScript', { sections: ['Project'] });
+    const { results: projectResults } = await searchService.search('React TypeScript', { sections: ['Project Notes'] });
     const { results: userResults } = await searchService.search('React TypeScript', { sections: ['User'] });
 
-    // Project results should contain entries with Project section
+    // Project results should contain entries with Project Notes section
     if (projectResults.length > 0) {
-      expect(projectResults[0].sections).toContain('Project');
+      expect(projectResults[0].sections).toContain('Project Notes');
     }
 
     // User results should contain entries with User section
