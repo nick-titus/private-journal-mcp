@@ -5,16 +5,16 @@ A comprehensive MCP (Model Context Protocol) server that provides Claude with pr
 ## Features
 
 ### Journaling
-- **Multi-section journaling**: Separate categories for feelings, project notes, user context, technical insights, and world knowledge
-- **Dual storage**: Project notes stay with projects, personal thoughts in user home directory
+- **Multi-section journaling**: Categories for user observations, project notes, and session reflections
+- **Centralized storage**: All entries in `~/.claude/.private-journal/` with automatic project tagging
 - **Timestamped entries**: Each entry automatically dated with microsecond precision
-- **YAML frontmatter**: Structured metadata for each entry
+- **YAML frontmatter**: Structured metadata including project tags
 
 ### Search & Discovery
 - **Semantic search**: Natural language queries using local AI embeddings
 - **Vector similarity**: Find conceptually related entries, not just keyword matches
+- **Project filtering**: Search within specific projects or across all entries
 - **Local AI processing**: Uses @xenova/transformers - no external API calls required
-- **Automatic indexing**: Embeddings generated for all entries on startup and ongoing
 
 ### Privacy & Performance
 - **Completely private**: All processing happens locally, no data leaves your machine
@@ -46,8 +46,6 @@ Add to your MCP settings (e.g., Claude Desktop configuration):
 }
 ```
 
-The server will automatically find a suitable location for the journal files.
-
 ## Local Development Installation
 
 Use a local build to test changes:
@@ -64,29 +62,21 @@ claude mcp add-json private-journal \
 -s user
 ```
 
-Adjust paths for your environment:
-- **Run from repo root**: This command must be run from the root of the cloned repository
-- **Node path**: If `node` is not in your shell's `PATH`, replace `"node"` in the command's JSON payload with the absolute path from `which node` (e.g., `/opt/homebrew/bin/node`)
-
-This replaces the npx installation with your local build.
-
 ## MCP Tools
-
-The server provides comprehensive journaling and search capabilities:
 
 ### `process_thoughts`
 Multi-section private journaling with these optional categories:
-- **feelings**: Private emotional processing space
-- **project_notes**: Technical insights specific to current project  
-- **user_context**: Notes about collaborating with humans
-- **technical_insights**: General software engineering learnings
-- **world_knowledge**: Domain knowledge and interesting discoveries
+- **user**: Observations about the user - preferences, values, communication style
+- **projectNotes**: Project-specific learnings - architecture, decisions, gotchas
+- **reflections**: Session retrospective - what worked, what didn't, lessons learned
+
+Entries are automatically tagged with the current project (detected from git repo).
 
 ### `search_journal`
 Semantic search across all journal entries:
 - **query** (required): Natural language search query
 - **limit**: Maximum results (default: 10)
-- **type**: Search scope - 'project', 'user', or 'both' (default: 'both')
+- **project**: Filter by project name (e.g., "betterpack")
 - **sections**: Filter by specific categories
 
 ### `read_journal_entry`
@@ -96,27 +86,49 @@ Read full content of specific entries:
 ### `list_recent_entries`
 Browse recent entries chronologically:
 - **limit**: Maximum entries (default: 10)
-- **type**: Entry scope - 'project', 'user', or 'both' (default: 'both')
+- **project**: Filter by project name
 - **days**: Days back to search (default: 30)
+
+## Slash Commands
+
+Companion slash commands for Claude Code (install in `~/.claude/commands/`):
+
+### `/prime-context`
+Load journal context at session start:
+- Reads USER-SUMMARY.md and PROJECT-SUMMARY.md
+- Lists recent entries for current project
+- Displays formatted status with token counts
+
+### `/reflect`
+End-of-session reflection ritual:
+- Captures learnings using `process_thoughts` tool
+- Auto-detects project from git repo
+- Displays formatted summary of captured content
+
+### `/synthesize`
+Generate summary documents from journal entries:
+- Creates USER-SUMMARY.md (global user context)
+- Creates PROJECT-SUMMARY.md (project-specific learnings)
+- Highlights changes from previous summaries
 
 ## File Structure
 
-### Project Journal (per project)
+### Centralized Storage
 ```
-.private-journal/
-├── 2025-05-31/
-│   ├── 14-30-45-123456.md          # Project notes entry
-│   ├── 14-30-45-123456.embedding   # Search index
+~/.claude/.private-journal/
+├── USER-SUMMARY.md              # Synthesized user context
+├── entries/                     # All timestamped entries
+│   ├── 2025-11-21/
+│   │   ├── 14-30-45-123456.md
+│   │   ├── 14-30-45-123456.embedding
+│   │   └── ...
 │   └── ...
-```
-
-### User Journal (global)
-```
-~/.private-journal/
-├── 2025-05-31/
-│   ├── 14-32-15-789012.md          # Personal thoughts entry
-│   ├── 14-32-15-789012.embedding   # Search index
-│   └── ...
+└── projects/
+    ├── betterpack/
+    │   └── PROJECT-SUMMARY.md   # Project-specific summary
+    ├── private-journal-mcp/
+    │   └── PROJECT-SUMMARY.md
+    └── ...
 ```
 
 ### Entry Format
@@ -124,18 +136,23 @@ Each markdown file contains YAML frontmatter and structured sections:
 
 ```markdown
 ---
-title: "2:30:45 PM - May 31, 2025"
-date: 2025-05-31T14:30:45.123Z
-timestamp: 1717160645123
+title: "2:30:45 PM - November 21, 2025"
+date: 2025-11-21T14:30:45.123Z
+timestamp: 1732199445123
+project: betterpack
 ---
 
-## Feelings
+## User
 
-I'm excited about this new search feature...
+Prefers explicit control over automatic behavior...
 
-## Technical Insights
+## Project Notes
 
-Vector embeddings provide semantic understanding...
+Architecture uses React Query for data fetching...
+
+## Reflections
+
+Session went well - TDD approach caught bugs early...
 ```
 
 ## Development
