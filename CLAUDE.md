@@ -32,50 +32,51 @@ npx jest tests/journal.test.ts
 
 ## Architecture Overview
 
-This is an MCP (Model Context Protocol) server that provides Claude with private journaling capabilities. The architecture consists of:
+This is an MCP (Model Context Protocol) server that provides Claude with private journaling capabilities.
 
 **Core Components:**
-- `src/index.ts` - CLI entry point with intelligent path resolution for journal storage
-- `src/server.ts` - MCP server using stdio transport with single `process_feelings` tool
+- `src/index.ts` - CLI entry point
+- `src/server.ts` - MCP server with stdio transport, registers all tools
 - `src/journal.ts` - File system operations for timestamped markdown entries
-- `src/types.ts` - TypeScript interfaces for the domain model
+- `src/paths.ts` - Path resolution and project detection (git repo or "general")
+- `src/embeddings.ts` - Local AI embeddings using @xenova/transformers
+- `src/search.ts` - Semantic search with vector similarity and project filtering
+- `src/types.ts` - TypeScript interfaces
 
-**Key Architecture Patterns:**
-- **Path Resolution Strategy**: Falls back through CWD → HOME → temp directories, avoiding system roots
-- **Timestamped Storage**: Uses `YYYY-MM-DD/HH-MM-SS-μμμμμμ.md` structure with microsecond precision
-- **YAML Frontmatter**: Each entry includes structured metadata (title, ISO date, Unix timestamp)
-- **MCP Tool Pattern**: Single tool registration with schema validation and error handling
+**Storage Architecture:**
+All entries stored centrally in `~/.claude/.private-journal/` with automatic project tagging:
+```
+~/.claude/.private-journal/
+├── USER-SUMMARY.md              # Synthesized user context
+├── entries/                     # All timestamped entries
+│   └── YYYY-MM-DD/
+│       ├── HH-MM-SS-μμμμμμ.md
+│       └── HH-MM-SS-μμμμμμ.embedding
+└── projects/
+    └── {project-name}/
+        └── PROJECT-SUMMARY.md
+```
 
-**File Organization:**
-- **Project journals**: `.private-journal/` in project root for project-specific notes
-- **Personal journals**: `~/.private-journal/` for cross-project personal thoughts  
-- **Daily structure**: `YYYY-MM-DD/HH-MM-SS-μμμμμμ.md` with microsecond precision
-- **Search index**: `.embedding` files alongside each journal entry for semantic search
-- TypeScript compilation to `dist/` for production
-- Jest tests in `tests/` directory with comprehensive file system mocking
+**Project Detection:**
+`detectProjectName()` in `src/paths.ts` returns the git repo name if in a git repo, otherwise "general". This tags all entries for filtering.
 
-## MCP Integration Details
+## MCP Tools
 
-The server provides comprehensive journaling and search capabilities through these tools:
+**`process_thoughts`** - Write journal entries with 3 optional sections:
+- `user`: Observations about the user (preferences, style)
+- `projectNotes`: Project-specific learnings (architecture, gotchas)
+- `reflections`: Session retrospective (what worked, what didn't)
 
-**Core Journaling:**
-- `process_thoughts` - Multi-section private journaling with categories for feelings, project notes, user context, technical insights, and world knowledge
+**`search_journal`** - Semantic search with project filtering
 
-**Search & Retrieval:**
-- `search_journal` - Natural language semantic search across all journal entries using local AI embeddings
-- `read_journal_entry` - Read full content of specific entries by file path
-- `list_recent_entries` - Browse recent entries chronologically with date filtering
+**`read_journal_entry`** - Read full entry by path
 
-**Key Features:**
-- **Dual Storage**: Project notes stored locally with codebase, personal thoughts in user's home directory
-- **Local AI Search**: Uses @xenova/transformers for semantic understanding without external API calls
-- **Automatic Indexing**: Embeddings generated automatically for all entries on first startup and ongoing writes
-- **Privacy First**: All processing happens locally, no data leaves your machine
+**`list_recent_entries`** - Browse recent entries, optionally filtered by project
 
-## Testing Approach
+## Testing
 
-- Uses Jest with ts-jest preset and mocked transformers library for embedding tests
-- Tests cover file system operations, timestamp formatting, directory creation, and search functionality
-- Temporary directories created/cleaned for each test to ensure isolation
-- Coverage tracking for core functionality (`src/journal.ts`, `src/types.ts`, `src/paths.ts`, `src/embeddings.ts`, `src/search.ts`)
-- Comprehensive embedding and search test suite with proper mocking for CI/CD environments
+- Jest with ts-jest preset
+- Transformers library mocked for CI/CD
+- Tests in `tests/` directory
+- Run single file: `npx jest tests/paths.test.ts`
+- Coverage: `npm test -- --coverage`
