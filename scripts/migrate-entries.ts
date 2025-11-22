@@ -85,7 +85,12 @@ async function migrateEmbedding(
   dryRun: boolean
 ): Promise<void> {
   const content = await fs.readFile(sourcePath, 'utf8');
-  const data = JSON.parse(content);
+  let data: Record<string, unknown>;
+  try {
+    data = JSON.parse(content);
+  } catch (parseError) {
+    throw new Error(`Corrupted embedding file (invalid JSON): ${sourcePath}`);
+  }
 
   // Add project field
   data.project = projectName;
@@ -107,46 +112,69 @@ async function migrateEmbedding(
   await fs.writeFile(destPath, JSON.stringify(data, null, 2), 'utf8');
 }
 
+interface MigrationResult {
+  migrated: number;
+  failed: number;
+  errors: string[];
+}
+
 async function migrateJournalDirectory(
   sourceDir: string,
   destDir: string,
   dryRun: boolean
-): Promise<number> {
+): Promise<MigrationResult> {
   const expandedSource = expandHome(sourceDir);
   const projectName = extractProjectFromPath(sourceDir);
-  let count = 0;
+  const result: MigrationResult = { migrated: 0, failed: 0, errors: [] };
 
+  let dateDirs: string[];
   try {
-    const dateDirs = await fs.readdir(expandedSource);
-
-    for (const dateDir of dateDirs) {
-      if (!dateDir.match(/^\d{4}-\d{2}-\d{2}$/)) continue;
-
-      const datePath = path.join(expandedSource, dateDir);
-      const files = await fs.readdir(datePath);
-
-      for (const file of files) {
-        const filePath = path.join(datePath, file);
-
-        if (file.endsWith('.md')) {
-          await migrateEntry(filePath, destDir, projectName, dryRun);
-          count++;
-        } else if (file.endsWith('.embedding')) {
-          await migrateEmbedding(filePath, destDir, projectName, dryRun);
-        }
-      }
-    }
+    dateDirs = await fs.readdir(expandedSource);
   } catch (error: unknown) {
     const err = error as NodeJS.ErrnoException;
     if (err.code !== 'ENOENT') {
-      console.error(`Error migrating ${sourceDir}:`, err.message);
+      result.failed++;
+      result.errors.push(`Failed to read directory ${sourceDir}: ${err.message}`);
+    }
+    return result;
+  }
+
+  for (const dateDir of dateDirs) {
+    if (!dateDir.match(/^\d{4}-\d{2}-\d{2}$/)) continue;
+
+    const datePath = path.join(expandedSource, dateDir);
+    let files: string[];
+    try {
+      files = await fs.readdir(datePath);
+    } catch (error: unknown) {
+      const err = error as NodeJS.ErrnoException;
+      result.failed++;
+      result.errors.push(`Failed to read date directory ${datePath}: ${err.message}`);
+      continue;
+    }
+
+    for (const file of files) {
+      const filePath = path.join(datePath, file);
+
+      try {
+        if (file.endsWith('.md')) {
+          await migrateEntry(filePath, destDir, projectName, dryRun);
+          result.migrated++;
+        } else if (file.endsWith('.embedding')) {
+          await migrateEmbedding(filePath, destDir, projectName, dryRun);
+        }
+      } catch (error: unknown) {
+        const err = error as Error;
+        result.failed++;
+        result.errors.push(`Failed to migrate ${filePath}: ${err.message}`);
+      }
     }
   }
 
-  return count;
+  return result;
 }
 
-async function main() {
+async function main(): Promise<number> {
   const dryRun = process.argv.includes('--dry-run');
   const destDir = expandHome(NEW_BASE_PATH);
 
@@ -160,18 +188,45 @@ async function main() {
   }
 
   let totalMigrated = 0;
+  let totalFailed = 0;
+  const allErrors: string[] = [];
 
   // Migrate user journal
   console.log(`\nMigrating user journal from ${OLD_USER_JOURNAL}...`);
-  totalMigrated += await migrateJournalDirectory(OLD_USER_JOURNAL, destDir, dryRun);
+  const userResult = await migrateJournalDirectory(OLD_USER_JOURNAL, destDir, dryRun);
+  totalMigrated += userResult.migrated;
+  totalFailed += userResult.failed;
+  allErrors.push(...userResult.errors);
 
   // Migrate project journals
   for (const projectJournal of OLD_PROJECT_JOURNALS) {
     console.log(`\nMigrating ${projectJournal}...`);
-    totalMigrated += await migrateJournalDirectory(projectJournal, destDir, dryRun);
+    const result = await migrateJournalDirectory(projectJournal, destDir, dryRun);
+    totalMigrated += result.migrated;
+    totalFailed += result.failed;
+    allErrors.push(...result.errors);
   }
 
   console.log(`\n${dryRun ? 'Would migrate' : 'Migrated'} ${totalMigrated} entries total.`);
+
+  if (totalFailed > 0) {
+    console.error(`\nFailed to migrate ${totalFailed} entries:`);
+    for (const error of allErrors) {
+      console.error(`  - ${error}`);
+    }
+    return 1;
+  }
+
+  return 0;
 }
 
-main().catch(console.error);
+main()
+  .then((exitCode) => {
+    if (exitCode !== 0) {
+      process.exit(exitCode);
+    }
+  })
+  .catch((error) => {
+    console.error('Migration failed:', error);
+    process.exit(1);
+  });
