@@ -118,7 +118,7 @@ describe('SearchService with project filtering', () => {
 
   describe('search', () => {
     it('should filter results by project', async () => {
-      const results = await service.search('architecture', {
+      const { results } = await service.search('architecture', {
         project: 'betterpack'
       });
 
@@ -129,7 +129,7 @@ describe('SearchService with project filtering', () => {
     });
 
     it('should return all projects when no filter specified', async () => {
-      const results = await service.search('architecture', {
+      const { results } = await service.search('architecture', {
         limit: 10
       });
 
@@ -139,7 +139,7 @@ describe('SearchService with project filtering', () => {
     });
 
     it('should include project field in SearchResult', async () => {
-      const results = await service.search('architecture');
+      const { results } = await service.search('architecture');
 
       // Every result should have a project field (even if undefined for legacy entries)
       results.forEach(result => {
@@ -148,7 +148,7 @@ describe('SearchService with project filtering', () => {
     });
 
     it('should return empty results for non-existent project', async () => {
-      const results = await service.search('architecture', {
+      const { results } = await service.search('architecture', {
         project: 'non-existent-project'
       });
 
@@ -158,7 +158,7 @@ describe('SearchService with project filtering', () => {
 
   describe('listRecent', () => {
     it('should filter recent entries by project', async () => {
-      const results = await service.listRecent({
+      const { results } = await service.listRecent({
         project: 'betterpack',
         limit: 10
       });
@@ -169,7 +169,7 @@ describe('SearchService with project filtering', () => {
     });
 
     it('should return entries from all projects when no filter', async () => {
-      const results = await service.listRecent({
+      const { results } = await service.listRecent({
         limit: 10
       });
 
@@ -178,7 +178,7 @@ describe('SearchService with project filtering', () => {
     });
 
     it('should include project field in results', async () => {
-      const results = await service.listRecent({
+      const { results } = await service.listRecent({
         limit: 10
       });
 

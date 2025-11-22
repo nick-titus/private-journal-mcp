@@ -13,7 +13,7 @@ export class JournalManager {
     this.embeddingService = EmbeddingService.getInstance();
   }
 
-  async writeEntry(content: string): Promise<void> {
+  async writeEntry(content: string): Promise<{ embeddingSucceeded: boolean }> {
     const timestamp = new Date();
     const projectName = detectProjectName(process.cwd());
     const dateString = this.formatDate(timestamp);
@@ -30,14 +30,15 @@ export class JournalManager {
     await fs.writeFile(filePath, formattedEntry, 'utf8');
 
     // Generate and save embedding
-    await this.generateEmbeddingForEntry(filePath, formattedEntry, timestamp, projectName);
+    const embeddingSucceeded = await this.generateEmbeddingForEntry(filePath, formattedEntry, timestamp, projectName);
+    return { embeddingSucceeded };
   }
 
   async writeThoughts(thoughts: {
     user?: string;
     projectNotes?: string;
     reflections?: string;
-  }): Promise<void> {
+  }): Promise<{ embeddingSucceeded: boolean }> {
     const timestamp = new Date();
     const projectName = detectProjectName(process.cwd());
 
@@ -55,7 +56,8 @@ export class JournalManager {
     await fs.writeFile(filePath, formattedEntry, 'utf8');
 
     // Generate and save embedding with project tag
-    await this.generateEmbeddingForEntry(filePath, formattedEntry, timestamp, projectName);
+    const embeddingSucceeded = await this.generateEmbeddingForEntry(filePath, formattedEntry, timestamp, projectName);
+    return { embeddingSucceeded };
   }
 
   private formatDate(date: Date): string {
@@ -144,12 +146,12 @@ ${sections.join('\n\n')}
     content: string,
     timestamp: Date,
     projectName: string
-  ): Promise<void> {
+  ): Promise<boolean> {
     try {
       const { text, sections } = this.embeddingService.extractSearchableText(content);
 
       if (text.trim().length === 0) {
-        return; // Skip empty entries
+        return true; // Skip empty entries - this is not a failure
       }
 
       const embedding = await this.embeddingService.generateEmbedding(text);
@@ -164,9 +166,11 @@ ${sections.join('\n\n')}
       };
 
       await this.embeddingService.saveEmbedding(filePath, embeddingData);
+      return true;
     } catch (error) {
       console.error(`Failed to generate embedding for ${filePath}:`, error);
       // Don't throw - embedding failure shouldn't prevent journal writing
+      return false;
     }
   }
 

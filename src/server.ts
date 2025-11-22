@@ -145,12 +145,15 @@ Write to any combination of sections. Entries are automatically tagged with the 
         }
 
         try {
-          await this.journalManager.writeThoughts(thoughts);
+          const { embeddingSucceeded } = await this.journalManager.writeThoughts(thoughts);
+          const message = embeddingSucceeded
+            ? 'Thoughts recorded successfully.'
+            : 'Thoughts recorded, but embedding generation failed. Entry may not appear in search results.';
           return {
             content: [
               {
                 type: 'text',
-                text: 'Thoughts recorded successfully.',
+                text: message,
               },
             ],
           };
@@ -172,19 +175,25 @@ Write to any combination of sections. Entries are automatically tagged with the 
         };
 
         try {
-          const results = await this.searchService.search(args.query, options);
+          const { results, warning } = await this.searchService.search(args.query, options);
+          let text = results.length > 0
+            ? `Found ${results.length} relevant entries:\n\n${results.map((result, i) =>
+                `${i + 1}. [Score: ${result.score.toFixed(3)}] ${new Date(result.timestamp).toLocaleDateString()}${result.project ? ` (${result.project})` : ''}\n` +
+                `   Sections: ${result.sections.join(', ')}\n` +
+                `   Path: ${result.path}\n` +
+                `   Excerpt: ${result.excerpt}\n`
+              ).join('\n')}`
+            : 'No relevant entries found.';
+
+          if (warning) {
+            text = `${warning}\n\n${text}`;
+          }
+
           return {
             content: [
               {
                 type: 'text',
-                text: results.length > 0
-                  ? `Found ${results.length} relevant entries:\n\n${results.map((result, i) =>
-                      `${i + 1}. [Score: ${result.score.toFixed(3)}] ${new Date(result.timestamp).toLocaleDateString()}${result.project ? ` (${result.project})` : ''}\n` +
-                      `   Sections: ${result.sections.join(', ')}\n` +
-                      `   Path: ${result.path}\n` +
-                      `   Excerpt: ${result.excerpt}\n`
-                    ).join('\n')}`
-                  : 'No relevant entries found.',
+                text,
               },
             ],
           };
@@ -233,19 +242,25 @@ Write to any combination of sections. Entries are automatically tagged with the 
         };
 
         try {
-          const results = await this.searchService.listRecent(options);
+          const { results, warning } = await this.searchService.listRecent(options);
+          let text = results.length > 0
+            ? `Recent entries (last ${days} days):\n\n${results.map((result, i) =>
+                `${i + 1}. ${new Date(result.timestamp).toLocaleDateString()}${result.project ? ` (${result.project})` : ''}\n` +
+                `   Sections: ${result.sections.join(', ')}\n` +
+                `   Path: ${result.path}\n` +
+                `   Excerpt: ${result.excerpt}\n`
+              ).join('\n')}`
+            : `No entries found in the last ${days} days.`;
+
+          if (warning) {
+            text = `${warning}\n\n${text}`;
+          }
+
           return {
             content: [
               {
                 type: 'text',
-                text: results.length > 0
-                  ? `Recent entries (last ${days} days):\n\n${results.map((result, i) =>
-                      `${i + 1}. ${new Date(result.timestamp).toLocaleDateString()}${result.project ? ` (${result.project})` : ''}\n` +
-                      `   Sections: ${result.sections.join(', ')}\n` +
-                      `   Path: ${result.path}\n` +
-                      `   Excerpt: ${result.excerpt}\n`
-                    ).join('\n')}`
-                  : `No entries found in the last ${days} days.`,
+                text,
               },
             ],
           };

@@ -170,7 +170,7 @@ TypeScript interfaces are really powerful for maintaining code quality.`;
     await new Promise(resolve => setTimeout(resolve, 2000));
 
     // Search for similar entries
-    const results = await searchService.search('feeling upset about TypeScript problems');
+    const { results } = await searchService.search('feeling upset about TypeScript problems');
 
     expect(results.length).toBeGreaterThan(0);
 
@@ -196,8 +196,8 @@ TypeScript interfaces are really powerful for maintaining code quality.`;
     await new Promise(resolve => setTimeout(resolve, 2000));
 
     // Search with section filter
-    const projectResults = await searchService.search('React TypeScript', { sections: ['Project'] });
-    const userResults = await searchService.search('React TypeScript', { sections: ['User'] });
+    const { results: projectResults } = await searchService.search('React TypeScript', { sections: ['Project'] });
+    const { results: userResults } = await searchService.search('React TypeScript', { sections: ['User'] });
 
     // Project results should contain entries with Project section
     if (projectResults.length > 0) {

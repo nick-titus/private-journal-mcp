@@ -14,6 +14,7 @@ export interface SearchResult {
   timestamp: number;
   excerpt: string;
   project?: string;  // Project name from centralized storage
+  warning?: string;  // Warning message if some embeddings failed to load
 }
 
 export interface SearchOptions {
@@ -36,7 +37,7 @@ export class SearchService {
     this.entriesPath = resolveEntriesPath();
   }
 
-  async search(query: string, options: SearchOptions = {}): Promise<SearchResult[]> {
+  async search(query: string, options: SearchOptions = {}): Promise<{ results: SearchResult[]; warning?: string }> {
     const {
       limit = 10,
       minScore = 0.1,
@@ -49,7 +50,7 @@ export class SearchService {
     const queryEmbedding = await this.embeddingService.generateEmbedding(query);
 
     // Collect all embeddings from centralized storage
-    const allEmbeddings = await this.loadEmbeddingsFromPath(this.entriesPath);
+    const { embeddings: allEmbeddings, failedCount } = await this.loadEmbeddingsFromPath(this.entriesPath);
 
     // Filter by criteria
     const filtered = allEmbeddings.filter(embedding => {
@@ -98,10 +99,16 @@ export class SearchService {
       .sort((a, b) => b.score - a.score)
       .slice(0, limit);
 
-    return results;
+    // Add warning if many embeddings failed to load
+    let warning: string | undefined;
+    if (failedCount > 0) {
+      warning = `Warning: ${failedCount} embedding(s) failed to load. Some entries may not appear in search results.`;
+    }
+
+    return { results, warning };
   }
 
-  async listRecent(options: SearchOptions = {}): Promise<SearchResult[]> {
+  async listRecent(options: SearchOptions = {}): Promise<{ results: SearchResult[]; warning?: string }> {
     const {
       limit = 10,
       project,
@@ -109,7 +116,7 @@ export class SearchService {
     } = options;
 
     // Load all embeddings from centralized storage
-    const allEmbeddings = await this.loadEmbeddingsFromPath(this.entriesPath);
+    const { embeddings: allEmbeddings, failedCount } = await this.loadEmbeddingsFromPath(this.entriesPath);
 
     // Filter by criteria
     const filtered = allEmbeddings.filter(embedding => {
@@ -142,7 +149,13 @@ export class SearchService {
         project: embedding.project
       }));
 
-    return results;
+    // Add warning if many embeddings failed to load
+    let warning: string | undefined;
+    if (failedCount > 0) {
+      warning = `Warning: ${failedCount} embedding(s) failed to load. Some entries may not appear in results.`;
+    }
+
+    return { results, warning };
   }
 
   async readEntry(filePath: string): Promise<string | null> {
@@ -156,8 +169,9 @@ export class SearchService {
     }
   }
 
-  private async loadEmbeddingsFromPath(basePath: string): Promise<EmbeddingData[]> {
+  private async loadEmbeddingsFromPath(basePath: string): Promise<{ embeddings: EmbeddingData[]; failedCount: number }> {
     const embeddings: EmbeddingData[] = [];
+    let failedCount = 0;
 
     try {
       const dayDirs = await fs.readdir(basePath);
@@ -181,18 +195,21 @@ export class SearchService {
             embeddings.push(embeddingData);
           } catch (error) {
             console.error(`Failed to load embedding ${embeddingFile}:`, error);
+            failedCount++;
             // Continue with other files
           }
         }
       }
     } catch (error) {
-      if ((error as any)?.code !== 'ENOENT') {
-        console.error(`Failed to read embeddings from ${basePath}:`, error);
+      if ((error as any)?.code === 'ENOENT') {
+        // Directory doesn't exist - return empty array (this is fine for new installations)
+        return { embeddings: [], failedCount: 0 };
       }
-      // Return empty array if directory doesn't exist
+      // Re-throw non-ENOENT errors so users know something is wrong
+      throw new Error(`Failed to read embeddings from ${basePath}: ${error instanceof Error ? error.message : error}`);
     }
 
-    return embeddings;
+    return { embeddings, failedCount };
   }
 
   private generateExcerpt(text: string, query: string, maxLength: number = 200): string {
