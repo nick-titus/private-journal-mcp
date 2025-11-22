@@ -16,9 +16,7 @@ export interface ProcessFeelingsRequest {
 }
 
 export interface ProcessThoughtsRequest {
-  feelings?: string;
-  project_notes?: string;
-  user_context?: string;
-  technical_insights?: string;
-  world_knowledge?: string;
+  nick?: string;         // Understanding Nick - preferences, values, style, domains
+  project?: string;      // Project learnings - architecture, decisions, gotchas
+  reflections?: string;  // Session retrospective - what worked, what didn't
 }
