@@ -7,14 +7,32 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { resolveEntriesPath } from '../src/paths.js';
 
-// Mock the transformers library
-jest.mock('@xenova/transformers', () => ({
-  pipeline: jest.fn().mockResolvedValue(
-    jest.fn().mockResolvedValue({
-      data: new Float32Array([0.1, 0.2, 0.3, 0.4, 0.5])
-    })
-  ),
-}));
+// Mock the EmbeddingService to return consistent 5-dimensional vectors
+// This ensures test embeddings (5-dim) match query embeddings (5-dim)
+jest.mock('../src/embeddings.js', () => {
+  const actual = jest.requireActual('../src/embeddings.js');
+  return {
+    ...actual,
+    EmbeddingService: {
+      getInstance: jest.fn().mockReturnValue({
+        generateEmbedding: jest.fn().mockResolvedValue([0.1, 0.2, 0.3, 0.4, 0.5]),
+        cosineSimilarity: jest.fn().mockImplementation((a: number[], b: number[]) => {
+          // Simple cosine similarity calculation
+          let dotProduct = 0;
+          let normA = 0;
+          let normB = 0;
+          for (let i = 0; i < a.length; i++) {
+            dotProduct += a[i] * b[i];
+            normA += a[i] * a[i];
+            normB += b[i] * b[i];
+          }
+          return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+        }),
+        initialize: jest.fn().mockResolvedValue(undefined),
+      }),
+    },
+  };
+});
 
 describe('SearchService with project filtering', () => {
   let testDir: string;
