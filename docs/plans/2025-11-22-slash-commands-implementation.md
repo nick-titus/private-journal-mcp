@@ -1,272 +1,229 @@
 # Slash Commands Implementation Plan
 
 **Date:** 2025-11-22
-**Branch:** feature/slash-commands (create from main after merging centralized-storage)
-**Status:** Planning
+**Branch:** feature/slash-commands (after merging centralized-storage)
+**Status:** Design Complete
 
 ## Overview
 
-Implement three slash commands that make centralized storage useful:
+Three slash commands for journal workflow:
 
-| When | Command | Purpose |
-|------|---------|---------|
-| Session start | `/context` | Load summaries + recent entries |
-| Session end | `/reflect` | Capture learnings to journal |
-| Weekly/periodic | `/synthesize` | Regenerate summary documents |
+| Command | When | What | Output |
+|---------|------|------|--------|
+| `/prime-context` | Session start | Load context for Claude | Confirmation + tokens |
+| `/reflect` | Session end | Capture learnings | Full formatted content |
+| `/synthesize` | Fresh session | Generate summaries | Full formatted content + changes |
 
-This approach keeps the user in control - no automatic hooks or latency.
+**Arguments:**
+- `/prime-context [user|project]` - optional filter, defaults to all
+- `/reflect [--project=name]` - optional explicit project tag
+- `/synthesize` - no args, generates both summaries
 
-## Design
+**Project detection (simplified):**
+1. Git repo? → repo name
+2. Explicit `--project` arg? → use that
+3. Otherwise → "general"
 
-### 1. /reflect Command
+---
 
-**Purpose:** Quick end-of-session capture of learnings
+## /prime-context Command
+
+**Purpose:** Load journal context at session start for Claude to use
+
+**Location:** `~/.claude/commands/prime-context.md`
+
+**Behavior:**
+- Reads `$ARGUMENTS` to determine scope
+- No args → load user + project + recent entries
+- "user" → load USER-SUMMARY.md only
+- "project" → load PROJECT-SUMMARY.md + recent entries only
+- Detects project from git root, defaults to "general"
+- Reads summary files directly from `~/.claude/.private-journal/`
+- Lists recent entries via `list_recent_entries` MCP tool
+
+**Output format:**
+```
+🧠 Context Loaded (private-journal-mcp)
+───────────────────────────────────────
+✅ User Context                 ~850 tk
+✅ Project Context              ~620 tk
+✅ Recent Entries (3)         ~1,090 tk
+   • Nov 22 - Slash commands design
+   • Nov 21 - Centralized storage
+   • Nov 19 - Initial project setup
+───────────────────────────────────────
+Total: ~2,560 tokens
+```
+
+**Error states:**
+- Missing USER-SUMMARY.md → `❌ User Context (not found - run /synthesize)`
+- Missing PROJECT-SUMMARY.md → `❌ Project Context (not found - run /synthesize)`
+- No recent entries → `⚠️ Recent Entries (none for this project)`
+
+---
+
+## /reflect Command
+
+**Purpose:** End-of-session ritual to capture learnings
 
 **Location:** `~/.claude/commands/reflect.md`
 
 **Behavior:**
-- Prompts Claude to reflect on the current session
-- Writes to journal using `process_thoughts` MCP tool
-- Detects project automatically (already implemented in MCP)
-- Should take <30 seconds to complete
+- Claude autonomously reflects on the session
+- Writes to journal via `process_thoughts` MCP tool
+- Detects project from git root, or uses `--project=name` override
+- Displays full formatted entry after writing
 
-**Implementation:**
-```markdown
----
-description: End-of-session reflection - capture learnings to journal
----
+**Arguments:**
+- `/reflect` - auto-detect project
+- `/reflect --project=foo` - explicit project tag
 
-Reflect on this session and write to your private journal.
+**Output format:**
+```
+📝 Session Reflection Captured
+───────────────────────────────────────
+📁 Project: private-journal-mcp
+🕐 Time: 4:32 PM - November 22, 2025
+───────────────────────────────────────
 
-Think about:
-1. **user section**: Any new observations about the user's preferences,
-   communication style, or how they like to work
-2. **projectNotes section**: Any learnings about the current project -
-   architecture decisions, gotchas discovered, patterns established
-3. **reflections section**: Session retrospective - what went well,
-   what could have been better, what you'd do differently
+👤 User (~320 tk)
+   • Prefers explicit control over automatic behavior
+   • Values simplicity - start simple, split later
 
-Use the `process_thoughts` tool from private-journal MCP to record your thoughts.
-Be specific and actionable - these entries help future sessions.
+🏗️ Project Notes (~280 tk)
+   • Centralized storage working well
+   • Slash commands more flexible than hooks
+
+💭 Reflections (~250 tk)
+   • Brainstorming before implementation paid off
+   • Good session - covered PR feedback and planning
+
+───────────────────────────────────────
+Total: ~850 tokens
 ```
 
-**Testing:**
-- Manual test: Run `/reflect` after a session, verify entry created
-- Verify project tag is correct
-- Verify all three sections are populated appropriately
+**What Claude reflects on:**
+- User preferences/style observed this session
+- Project learnings (architecture, gotchas, decisions)
+- What went well, what could improve, lessons learned
 
 ---
 
-### 2. /synthesize Command
+## /synthesize Command
 
-**Purpose:** Generate/update summary documents from journal entries
+**Purpose:** Generate summary documents from journal entries, with changes highlighted
 
 **Location:** `~/.claude/commands/synthesize.md`
 
 **Behavior:**
-- Reads recent journal entries (user-level and project-specific)
-- Generates two summary documents:
-  - `~/.claude/.private-journal/USER-SUMMARY.md`
-  - `~/.claude/.private-journal/projects/{project}/PROJECT-SUMMARY.md`
-- Should be run periodically (weekly) or when summaries feel stale
+- Run in fresh session for max context
+- Reads all relevant entries via `search_journal` / `list_recent_entries`
+- Generates USER-SUMMARY.md and PROJECT-SUMMARY.md
+- Compares to previous summaries (if exist) to identify changes
+- Displays full content with **changes highlighted at top**
 
-**Summary Document Schemas:**
+**Output format:**
+```
+🔄 Summaries Generated
+───────────────────────────────────────
 
-```markdown
-# USER-SUMMARY.md
-## Communication Preferences
-- [bullet points]
+🆕 What's Changed
+───────────────────────────────────────
+• [User] Added: prefers formatted terminal output with boxes/emojis
+• [User] Refined: "start simple" → "start simple, split later if needed"
+• [Project Notes] Added: detectProjectName simplified to git-or-general
 
-## Working Style
-- [bullet points]
+📄 USER-SUMMARY.md (18 entries → ~950 tk)
+───────────────────────────────────────
+👤 Communication
+   • Prefers explicit control over automatic behavior
+   • Values simplicity - start simple, split later
+   • 🆕 Likes formatted terminal output with boxes/emojis
 
-## Technical Preferences
-- [bullet points]
+⚙️ Working Style
+   • Uses TDD, brainstorming before implementation
 
-## Pet Peeves / Anti-patterns
-- [bullet points]
+📄 PROJECT-SUMMARY.md (7 entries → ~620 tk)
+   private-journal-mcp
+───────────────────────────────────────
+🏗️ Architecture
+   • MCP server with stdio transport
+   • Centralized storage at ~/.claude/.private-journal/
 
-## What Works Well
-- [bullet points]
+⚠️ Gotchas
+   • ESM imports need .js extension
+   • 🆕 detectProjectName: git repo or "general", no dir fallback
 
-## Domain Context
-- [bullet points about domains they work in]
-
----
-*Last synthesized: {date}*
-*Based on {n} entries from {date_range}*
+───────────────────────────────────────
+Total: ~1,570 tokens
 ```
 
-```markdown
-# PROJECT-SUMMARY.md ({project-name})
-## Architecture Overview
-- [bullet points]
-
-## Key Patterns & Conventions
-- [bullet points]
-
-## Gotchas / Landmines
-- [bullet points]
-
-## Decisions Made & Why
-- [bullet points]
-
-## Things Tried & Failed
-- [bullet points]
+**First run (no previous summary):**
+- Skip "What's Changed" section
+- Show `📄 USER-SUMMARY.md (new)` instead
 
 ---
-*Last synthesized: {date}*
-*Based on {n} entries*
+
+## MCP Changes
+
+**Update `detectProjectName()` in `src/paths.ts`:**
+
+Current logic:
+```
+1. Git repo? → repo name
+2. Fallback → directory basename
+3. Special cases (home, /tmp) → "general"
 ```
 
-**Implementation:**
-```markdown
----
-description: Generate summary documents from journal entries
----
-
-Generate or update the journal summary documents.
-
-## Steps:
-
-1. **Detect current project** using git root or directory name
-
-2. **Read recent entries** using `search_journal` and `list_recent_entries`:
-   - For USER-SUMMARY: entries with `user` section content (last 90 days)
-   - For PROJECT-SUMMARY: entries tagged with current project
-
-3. **Generate USER-SUMMARY.md** at `~/.claude/.private-journal/USER-SUMMARY.md`:
-   - Synthesize patterns from `user` and `reflections` sections
-   - Focus on actionable preferences and working style
-   - Keep concise (~500-1000 words)
-
-4. **Generate PROJECT-SUMMARY.md** at `~/.claude/.private-journal/projects/{project}/PROJECT-SUMMARY.md`:
-   - Synthesize from `projectNotes` and `reflections` sections
-   - Focus on architecture, patterns, and gotchas
-   - Keep concise (~500-1000 words)
-
-5. **Write the files** using standard file operations
-
-Report what was updated and key insights captured.
+New logic (simplified):
+```
+1. Git repo? → repo name
+2. Otherwise → "general"
 ```
 
-**New MCP Tool Required:** `list_projects`
-- Returns list of unique project names from all entries
-- Useful for synthesize command to know what projects exist
+**Why:** Prevents random directories (Downloads, Desktop, etc.) from becoming "projects". User can override with `--project` arg in slash commands.
 
----
-
-### 3. /context Command
-
-**Purpose:** Load journal context at the beginning of a session
-
-**Location:** `~/.claude/commands/context.md`
-
-**Behavior:**
-- Reads USER-SUMMARY.md (user preferences, working style)
-- Detects current project from git root
-- Reads PROJECT-SUMMARY.md for that project (if exists)
-- Lists last 3-5 entries for current project
-- Total context: ~3-5k tokens
-
-**Implementation:**
-```markdown
----
-description: Load journal context for this session
----
-
-Load my private journal context to inform this session.
-
-## Steps:
-
-1. **Read USER-SUMMARY.md** from `~/.claude/.private-journal/USER-SUMMARY.md`
-   - Contains: communication preferences, working style, domain context
-   - If file doesn't exist, note that /synthesize needs to be run
-
-2. **Detect current project** from git root or directory name
-
-3. **Read PROJECT-SUMMARY.md** from `~/.claude/.private-journal/projects/{project}/PROJECT-SUMMARY.md`
-   - Contains: architecture, patterns, gotchas for this project
-   - If file doesn't exist, note that /synthesize needs to be run for this project
-
-4. **List recent entries** using `list_recent_entries` with project filter
-   - Show last 3-5 entries for additional recent context
-
-5. **Summarize** what context was loaded and any gaps (missing summaries)
-
-Use this context throughout our conversation to work more effectively.
-```
-
-**Why slash command over hook/skill:**
-- User controls when context is loaded
-- No latency on quick sessions
-- Can run mid-session if forgotten
-- Dead simple - just a prompt file
-
----
-
-## Implementation Tasks
-
-### Phase 1: Slash Commands (No Code Changes)
-
-#### Task 1: Create /reflect command
-- Create `~/.claude/commands/reflect.md`
-- Test manually after a session
-- Verify entry created with correct project tag
-
-#### Task 2: Create /synthesize command
-- Create `~/.claude/commands/synthesize.md`
-- Create directory structure: `~/.claude/.private-journal/projects/`
-- Test manually - verify summaries are generated
-- Iterate on prompt for quality
-
-#### Task 3: Create /context command
-- Create `~/.claude/commands/context.md`
-- Test at session start
-- Verify summaries and recent entries are loaded
-
-### Phase 2: MCP Enhancements (Optional)
-
-#### Task 4: Add list_projects tool
-**Files:**
-- `src/server.ts` - Add tool definition
-- `src/search.ts` - Add method to extract unique projects
-
+**Code change:**
 ```typescript
-// In SearchService
-async listProjects(): Promise<string[]> {
-  const { results } = await this.loadAllEmbeddings();
-  const projects = new Set(results.map(e => e.project).filter(Boolean));
-  return Array.from(projects).sort();
+export function detectProjectName(dirPath: string): string {
+  // Try to get git repo root
+  try {
+    const gitRoot = execSync('git rev-parse --show-toplevel', {
+      cwd: dirPath,
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: 5000
+    }).trim();
+    return path.basename(gitRoot);
+  } catch (error) {
+    // Not in a git repo → general
+    if (isNodeError(error) && error.status === 128) {
+      return 'general';
+    }
+    // Unexpected error → log and default to general
+    console.error('Warning: error detecting project:', error);
+    return 'general';
+  }
 }
 ```
 
-This helps `/synthesize` know what projects exist.
-
-### Phase 3: Documentation
-
-#### Task 5: Update README
-- Document the three commands
-- Add workflow examples
-- Explain the summary documents
-
 ---
 
-## File Structure After Implementation
+## File Structure
 
 ```
 ~/.claude/
 ├── commands/
-│   ├── context.md          # NEW - load context at session start
-│   ├── reflect.md          # NEW - capture learnings at session end
-│   └── synthesize.md       # NEW - generate summary documents
+│   ├── prime-context.md    # Load context at session start
+│   ├── reflect.md          # Capture learnings at session end
+│   └── synthesize.md       # Generate summary documents
 └── .private-journal/
     ├── USER-SUMMARY.md     # Generated by /synthesize
     ├── entries/
     │   └── ...
     └── projects/
         ├── betterpack/
-        │   └── PROJECT-SUMMARY.md  # Generated by /synthesize
+        │   └── PROJECT-SUMMARY.md
         ├── private-journal-mcp/
         │   └── PROJECT-SUMMARY.md
         └── ...
@@ -274,73 +231,53 @@ This helps `/synthesize` know what projects exist.
 
 ---
 
-## Testing Plan
+## Implementation Tasks
 
-1. **Manual /reflect test:**
-   - Start session, do some work
-   - Run `/reflect`
-   - Verify entry created with correct project tag
-   - Verify all three sections are meaningful
+### Phase 1: MCP Update
+- Update `detectProjectName()` to simplified logic (git repo or "general")
+- Update tests for new behavior
+- Commit to centralized-storage branch
 
-2. **Manual /synthesize test:**
-   - Run `/synthesize`
-   - Verify USER-SUMMARY.md created at `~/.claude/.private-journal/`
-   - Verify PROJECT-SUMMARY.md created at `~/.claude/.private-journal/projects/{project}/`
-   - Review content quality - should be actionable, not just a dump
+### Phase 2: Slash Commands
+- Create `~/.claude/commands/prime-context.md`
+- Create `~/.claude/commands/reflect.md`
+- Create `~/.claude/commands/synthesize.md`
+- Test each manually
 
-3. **Manual /context test:**
-   - Start new session in a project with existing summaries
-   - Run `/context`
-   - Verify USER-SUMMARY.md content is displayed
-   - Verify PROJECT-SUMMARY.md content is displayed
-   - Verify recent entries are listed
-   - Test in project without summaries - should note they're missing
+### Phase 3: Bootstrap
+- Run `/synthesize` to generate initial summaries
+- Run `/prime-context` to verify loading works
+- Run `/reflect` at end of a real session
 
----
-
-## Success Criteria
-
-- [ ] `/reflect` creates meaningful entries in <30 seconds
-- [ ] `/synthesize` generates useful, actionable summaries
-- [ ] `/context` loads summaries + recent entries in <10 seconds
-- [ ] Total context from `/context` is <5k tokens
-- [ ] Summaries actually improve session quality (subjective)
-
----
-
-## Open Questions
-
-1. **How often should /synthesize run?**
-   - Weekly manual? (recommended to start)
-   - After N new entries?
-   - Could add a reminder in /reflect output
-
-2. **Token budget for summaries?**
-   - USER-SUMMARY: ~1k tokens
-   - PROJECT-SUMMARY: ~1k tokens
-   - Recent entries (3-5): ~2k tokens
-   - Total: ~4k tokens - reasonable
-
-3. **Should /context be remembered?**
-   - Currently manual each session
-   - Could mention in CLAUDE.md to run at session start
-   - Keep it simple for now - manual is fine
+### Phase 4: Documentation
+- Update README with command usage
+- Add workflow examples
 
 ---
 
 ## Estimated Effort
 
-| Phase | Tasks | Effort |
-|-------|-------|--------|
-| Phase 1 | Three slash commands | 1 hour |
-| Phase 2 | MCP list_projects (optional) | 30 min |
-| Phase 3 | Documentation | 30 min |
+| Phase | Effort |
+|-------|--------|
+| MCP update | 15 min |
+| Slash commands | 45 min |
+| Bootstrap & test | 15 min |
+| Documentation | 15 min |
+| **Total** | ~1.5 hours |
 
-**Total:** ~2 hours (or ~1.5 hours without Phase 2)
+---
+
+## Success Criteria
+
+- [ ] `/prime-context` loads context with token counts in <10 seconds
+- [ ] `/reflect` creates formatted entry in <30 seconds
+- [ ] `/synthesize` generates summaries with changes highlighted
+- [ ] Project detection uses git-or-general logic
+- [ ] All output uses consistent box/emoji formatting
 
 ---
 
 ## Dependencies
 
 - Centralized storage PR must be merged first
-- Requires existing MCP tools: `process_thoughts`, `search_journal`, `list_recent_entries`
+- Requires MCP tools: `process_thoughts`, `search_journal`, `list_recent_entries`
