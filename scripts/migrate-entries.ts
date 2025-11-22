@@ -9,6 +9,13 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
+/**
+ * Type guard to check if an error is a Node.js ErrnoException
+ */
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && 'code' in error;
+}
+
 const OLD_PROJECT_JOURNALS = [
   '~/Dev/episodic-memory/.private-journal',
   '~/Dev/tpf-website/.private-journal',
@@ -32,7 +39,8 @@ function extractProjectFromPath(sourcePath: string): string {
   // ~/Dev/betterpack/.private-journal -> betterpack
   // ~/.private-journal -> general
   // ~/Dev/.private-journal -> general
-  const parts = sourcePath.split('/');
+  // Use path.sep for cross-platform compatibility, but also handle / for tilde paths
+  const parts = sourcePath.split(/[/\\]/);
   const journalIdx = parts.findIndex(p => p === '.private-journal');
   if (journalIdx > 0) {
     const projectDir = parts[journalIdx - 1];
@@ -131,10 +139,9 @@ async function migrateJournalDirectory(
   try {
     dateDirs = await fs.readdir(expandedSource);
   } catch (error: unknown) {
-    const err = error as NodeJS.ErrnoException;
-    if (err.code !== 'ENOENT') {
+    if (isNodeError(error) && error.code !== 'ENOENT') {
       result.failed++;
-      result.errors.push(`Failed to read directory ${sourceDir}: ${err.message}`);
+      result.errors.push(`Failed to read directory ${sourceDir}: ${error.message}`);
     }
     return result;
   }
@@ -147,9 +154,8 @@ async function migrateJournalDirectory(
     try {
       files = await fs.readdir(datePath);
     } catch (error: unknown) {
-      const err = error as NodeJS.ErrnoException;
       result.failed++;
-      result.errors.push(`Failed to read date directory ${datePath}: ${err.message}`);
+      result.errors.push(`Failed to read date directory ${datePath}: ${error instanceof Error ? error.message : String(error)}`);
       continue;
     }
 
@@ -164,9 +170,8 @@ async function migrateJournalDirectory(
           await migrateEmbedding(filePath, destDir, projectName, dryRun);
         }
       } catch (error: unknown) {
-        const err = error as Error;
         result.failed++;
-        result.errors.push(`Failed to migrate ${filePath}: ${err.message}`);
+        result.errors.push(`Failed to migrate ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
   }

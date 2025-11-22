@@ -5,6 +5,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { EmbeddingService, EmbeddingData } from './embeddings.js';
 import { resolveEntriesPath } from './paths.js';
+import { isNodeError } from './types.js';
 
 export interface SearchResult {
   path: string;
@@ -162,7 +163,7 @@ export class SearchService {
     try {
       return await fs.readFile(filePath, 'utf8');
     } catch (error) {
-      if ((error as any)?.code === 'ENOENT') {
+      if (isNodeError(error) && error.code === 'ENOENT') {
         return null;
       }
       throw error;
@@ -201,7 +202,7 @@ export class SearchService {
         }
       }
     } catch (error) {
-      if ((error as any)?.code === 'ENOENT') {
+      if (isNodeError(error) && error.code === 'ENOENT') {
         // Directory doesn't exist - return empty array (this is fine for new installations)
         return { embeddings: [], failedCount: 0 };
       }

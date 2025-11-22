@@ -14,9 +14,8 @@ import {
 
 describe('detectProjectName', () => {
   it('should extract project name from git repo root', () => {
-    // When in /Users/ntitus/Dev/private-journal-mcp (the current repo)
-    // Should return the git repo basename
-    const result = detectProjectName('/Users/ntitus/Dev/mcp-servers/private-journal-mcp/src');
+    // Use process.cwd() since we're already in the git repo when running tests
+    const result = detectProjectName(process.cwd());
     expect(result).toBe('private-journal-mcp');
   });
 

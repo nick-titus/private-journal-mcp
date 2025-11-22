@@ -5,6 +5,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { resolveEntriesPath, detectProjectName } from './paths.js';
 import { EmbeddingService, EmbeddingData } from './embeddings.js';
+import { isNodeError } from './types.js';
 
 export class JournalManager {
   private embeddingService: EmbeddingService;
@@ -211,7 +212,7 @@ ${sections.join('\n\n')}
         }
       }
     } catch (error) {
-      if ((error as any)?.code !== 'ENOENT') {
+      if (!isNodeError(error) || error.code !== 'ENOENT') {
         console.error(`Failed to scan ${entriesPath} for missing embeddings:`, error);
       }
     }
