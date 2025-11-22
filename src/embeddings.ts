@@ -10,6 +10,7 @@ export interface EmbeddingData {
   sections: string[];
   timestamp: number;
   path: string;
+  project?: string;  // Optional project tag for centralized storage
 }
 
 export class EmbeddingService {

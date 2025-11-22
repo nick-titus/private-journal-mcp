@@ -5,9 +5,34 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 
-import { EmbeddingService } from '../src/embeddings';
+import { EmbeddingService, EmbeddingData } from '../src/embeddings';
 import { SearchService } from '../src/search';
 import { JournalManager } from '../src/journal';
+
+describe('EmbeddingData schema', () => {
+  it('should support optional project field', () => {
+    const data: EmbeddingData = {
+      embedding: [0.1, 0.2],
+      text: 'test',
+      sections: ['nick'],
+      timestamp: Date.now(),
+      path: '/test/path.md',
+      project: 'betterpack'
+    };
+    expect(data.project).toBe('betterpack');
+  });
+
+  it('should allow project to be undefined', () => {
+    const data: EmbeddingData = {
+      embedding: [0.1, 0.2],
+      text: 'test',
+      sections: ['nick'],
+      timestamp: Date.now(),
+      path: '/test/path.md'
+    };
+    expect(data.project).toBeUndefined();
+  });
+});
 
 describe('Embedding and Search functionality', () => {
   let projectTempDir: string;
