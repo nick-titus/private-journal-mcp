@@ -4,8 +4,8 @@
 import * as path from 'path';
 import { execSync } from 'child_process';
 
-// Regex to validate safe path characters (alphanumeric, slash, dash, underscore, dot, space)
-const SAFE_PATH_REGEX = /^[a-zA-Z0-9/_\-.\s]+$/;
+// Regex to validate safe path characters (alphanumeric, slash, dash, underscore, dot, space, colon, backslash for Windows)
+const SAFE_PATH_REGEX = /^[a-zA-Z0-9/_\-.\s:\\]+$/;
 
 /**
  * Validates that a path contains only safe characters
@@ -29,20 +29,13 @@ export function resolveJournalBasePath(): string {
 
 /**
  * Detects project name from a directory path
- * Tries git root first, falls back to directory basename
+ * Returns git repo name if in a git repo, otherwise "general"
  */
 export function detectProjectName(dirPath: string): string {
-  const home = process.env.HOME || process.env.USERPROFILE || '';
-
-  // Don't tag home directory or system paths as projects
-  if (dirPath === home || dirPath === '/' || dirPath === '/tmp') {
-    return 'general';
-  }
-
   // Validate path to prevent command injection
   if (!isValidPath(dirPath)) {
     console.warn(`Warning: Path contains potentially unsafe characters, skipping git detection: ${dirPath}`);
-    return path.basename(dirPath) || 'general';
+    return 'general';
   }
 
   // Try to get git repo root
@@ -55,13 +48,13 @@ export function detectProjectName(dirPath: string): string {
     }).trim();
     return path.basename(gitRoot);
   } catch (error: unknown) {
-    // Exit code 128 means "not a git repository" - this is expected and handled silently
+    // Exit code 128 means "not a git repository" - expected, return general
     if (error instanceof Error && 'status' in error && (error as { status: number }).status === 128) {
-      return path.basename(dirPath) || 'general';
+      return 'general';
     }
     // Log unexpected errors (network issues, permission problems, timeouts, etc.)
     console.error('Unexpected error detecting git root:', error instanceof Error ? error.message : error);
-    return path.basename(dirPath) || 'general';
+    return 'general';
   }
 }
 
