@@ -1,10 +1,71 @@
 // ABOUTME: Unit tests for path resolution utilities
-// ABOUTME: Tests cross-platform fallback logic and environment handling
+// ABOUTME: Tests centralized path resolution and project detection
 
 import * as path from 'path';
-import { resolveJournalPath, resolveUserJournalPath, resolveProjectJournalPath } from '../src/paths';
+import {
+  detectProjectName,
+  resolveJournalBasePath,
+  resolveEntriesPath,
+  resolveProjectSummaryPath,
+  resolveJournalPath,
+  resolveUserJournalPath,
+  resolveProjectJournalPath
+} from '../src/paths.js';
 
-describe('Path resolution utilities', () => {
+describe('detectProjectName', () => {
+  it('should extract project name from git repo root', () => {
+    // When in /Users/ntitus/Dev/private-journal-mcp (the current repo)
+    // Should return the git repo basename
+    const result = detectProjectName('/Users/ntitus/Dev/mcp-servers/private-journal-mcp/src');
+    expect(result).toBe('private-journal-mcp');
+  });
+
+  it('should return directory basename when not in git repo', () => {
+    const result = detectProjectName('/tmp/random-folder');
+    expect(result).toBe('random-folder');
+  });
+
+  it('should return "general" for home directory', () => {
+    const result = detectProjectName(process.env.HOME || '/Users/ntitus');
+    expect(result).toBe('general');
+  });
+
+  it('should return "general" for root directory', () => {
+    const result = detectProjectName('/');
+    expect(result).toBe('general');
+  });
+
+  it('should return "general" for /tmp', () => {
+    const result = detectProjectName('/tmp');
+    expect(result).toBe('general');
+  });
+});
+
+describe('resolveJournalBasePath', () => {
+  it('should return ~/.claude/.private-journal/', () => {
+    const result = resolveJournalBasePath();
+    const expected = path.join(process.env.HOME || '', '.claude', '.private-journal');
+    expect(result).toBe(expected);
+  });
+});
+
+describe('resolveEntriesPath', () => {
+  it('should return entries subdirectory', () => {
+    const result = resolveEntriesPath();
+    const expected = path.join(process.env.HOME || '', '.claude', '.private-journal', 'entries');
+    expect(result).toBe(expected);
+  });
+});
+
+describe('resolveProjectSummaryPath', () => {
+  it('should return project summary path', () => {
+    const result = resolveProjectSummaryPath('betterpack');
+    const expected = path.join(process.env.HOME || '', '.claude', '.private-journal', 'projects', 'betterpack');
+    expect(result).toBe(expected);
+  });
+});
+
+describe('Legacy path exports (backwards compatibility)', () => {
   let originalEnv: NodeJS.ProcessEnv;
 
   beforeEach(() => {
@@ -15,80 +76,21 @@ describe('Path resolution utilities', () => {
     process.env = originalEnv;
   });
 
-  test('resolveJournalPath uses current directory when reasonable', () => {
-    // Mock a reasonable current working directory
-    const mockCwd = '/Users/test/projects/my-app';
-    jest.spyOn(process, 'cwd').mockReturnValue(mockCwd);
-    
+  test('resolveJournalPath returns base path', () => {
     const result = resolveJournalPath('.private-journal', true);
-    expect(result).toBe(path.join(mockCwd, '.private-journal'));
+    const expected = path.join(process.env.HOME || '', '.claude', '.private-journal');
+    expect(result).toBe(expected);
   });
 
-  test('resolveJournalPath skips system directories', () => {
-    const systemPaths = ['/', 'C:\\', '/System', '/usr'];
-    
-    systemPaths.forEach(systemPath => {
-      jest.spyOn(process, 'cwd').mockReturnValue(systemPath);
-      process.env.HOME = '/Users/test';
-      
-      const result = resolveJournalPath('.private-journal', true);
-      expect(result).toBe('/Users/test/.private-journal');
-    });
-  });
-
-  test('resolveJournalPath falls back to HOME when current directory excluded', () => {
-    process.env.HOME = '/Users/test';
-    delete process.env.USERPROFILE;
-    
-    const result = resolveJournalPath('.private-journal', false);
-    expect(result).toBe('/Users/test/.private-journal');
-  });
-
-  test('resolveJournalPath uses USERPROFILE on Windows', () => {
-    delete process.env.HOME;
-    process.env.USERPROFILE = 'C:\\Users\\test';
-    
-    const result = resolveJournalPath('.private-journal', false);
-    expect(result).toBe(path.join('C:\\Users\\test', '.private-journal'));
-  });
-
-  test('resolveJournalPath falls back to temp directory', () => {
-    delete process.env.HOME;
-    delete process.env.USERPROFILE;
-    delete process.env.TEMP;
-    delete process.env.TMP;
-    
-    const result = resolveJournalPath('.private-journal', false);
-    expect(result).toBe('/tmp/.private-journal');
-  });
-
-  test('resolveUserJournalPath excludes current directory', () => {
-    const mockCwd = '/Users/test/projects/my-app';
-    jest.spyOn(process, 'cwd').mockReturnValue(mockCwd);
-    process.env.HOME = '/Users/test';
-    
+  test('resolveUserJournalPath returns base path', () => {
     const result = resolveUserJournalPath();
-    expect(result).toBe('/Users/test/.private-journal');
-    expect(result).not.toContain('projects/my-app');
+    const expected = path.join(process.env.HOME || '', '.claude', '.private-journal');
+    expect(result).toBe(expected);
   });
 
-  test('resolveProjectJournalPath includes current directory', () => {
-    const mockCwd = '/Users/test/projects/my-app';
-    jest.spyOn(process, 'cwd').mockReturnValue(mockCwd);
-    
+  test('resolveProjectJournalPath returns base path', () => {
     const result = resolveProjectJournalPath();
-    expect(result).toBe(path.join(mockCwd, '.private-journal'));
-  });
-
-  test('both user and project paths are consistent when no project context', () => {
-    // Simulate no reasonable project directory
-    jest.spyOn(process, 'cwd').mockReturnValue('/');
-    process.env.HOME = '/Users/test';
-    
-    const userPath = resolveUserJournalPath();
-    const projectPath = resolveProjectJournalPath();
-    
-    expect(userPath).toBe('/Users/test/.private-journal');
-    expect(projectPath).toBe('/Users/test/.private-journal');
+    const expected = path.join(process.env.HOME || '', '.claude', '.private-journal');
+    expect(result).toBe(expected);
   });
 });

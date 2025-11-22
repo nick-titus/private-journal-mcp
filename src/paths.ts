@@ -1,64 +1,66 @@
-// ABOUTME: Path resolution utilities for journal storage locations
-// ABOUTME: Provides cross-platform fallback logic for finding suitable directories
+// ABOUTME: Path resolution utilities for centralized journal storage
+// ABOUTME: All entries stored in ~/.claude/.private-journal/ with project tagging
 
 import * as path from 'path';
+import { execSync } from 'child_process';
 
 /**
- * Resolves the best available directory for journal storage
- * @param subdirectory - subdirectory name (e.g., '.private-journal')
- * @param includeCurrentDirectory - whether to consider current working directory
- * @returns resolved path to journal directory
+ * Returns the centralized journal storage path
  */
+export function resolveJournalBasePath(): string {
+  const home = process.env.HOME || process.env.USERPROFILE || '/tmp';
+  return path.join(home, '.claude', '.private-journal');
+}
+
+/**
+ * Detects project name from a directory path
+ * Tries git root first, falls back to directory basename
+ */
+export function detectProjectName(dirPath: string): string {
+  const home = process.env.HOME || process.env.USERPROFILE || '';
+
+  // Don't tag home directory or system paths as projects
+  if (dirPath === home || dirPath === '/' || dirPath === '/tmp') {
+    return 'general';
+  }
+
+  // Try to get git repo root
+  try {
+    const gitRoot = execSync('git rev-parse --show-toplevel', {
+      cwd: dirPath,
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe']
+    }).trim();
+    return path.basename(gitRoot);
+  } catch {
+    // Not in a git repo, use directory basename
+    return path.basename(dirPath) || 'general';
+  }
+}
+
+/**
+ * Returns path to entries directory
+ */
+export function resolveEntriesPath(): string {
+  return path.join(resolveJournalBasePath(), 'entries');
+}
+
+/**
+ * Returns path to a project's summary directory
+ */
+export function resolveProjectSummaryPath(projectName: string): string {
+  return path.join(resolveJournalBasePath(), 'projects', projectName);
+}
+
+// Legacy exports for backwards compatibility during migration
 export function resolveJournalPath(subdirectory: string = '.private-journal', includeCurrentDirectory: boolean = true): string {
-  const possiblePaths = [];
-
-  // Try current working directory only if requested and it's reasonable
-  if (includeCurrentDirectory) {
-    try {
-      const cwd = process.cwd();
-      // Don't use root directories or other system directories
-      if (cwd !== '/' && cwd !== 'C:\\' && cwd !== '/System' && cwd !== '/usr') {
-        possiblePaths.push(path.join(cwd, subdirectory));
-      }
-    } catch {
-      // Ignore errors getting cwd
-    }
-  }
-
-  // Try home directories (cross-platform)
-  if (process.env.HOME) {
-    possiblePaths.push(path.join(process.env.HOME, subdirectory));
-  }
-  if (process.env.USERPROFILE) {
-    possiblePaths.push(path.join(process.env.USERPROFILE, subdirectory));
-  }
-
-  // Try temp directories as last resort
-  possiblePaths.push(path.join('/tmp', subdirectory));
-  if (process.env.TEMP) {
-    possiblePaths.push(path.join(process.env.TEMP, subdirectory));
-  }
-  if (process.env.TMP) {
-    possiblePaths.push(path.join(process.env.TMP, subdirectory));
-  }
-
-  // Filter out null/undefined and return first valid path
-  const validPaths = possiblePaths.filter(Boolean);
-  return validPaths[0] || path.join('/tmp', subdirectory);
+  return resolveJournalBasePath();
 }
 
-/**
- * Resolves user home directory for personal journal storage
- * @returns path to user's private journal directory
- */
 export function resolveUserJournalPath(): string {
-  return resolveJournalPath('.private-journal', false);
+  return resolveJournalBasePath();
 }
 
-/**
- * Resolves project directory for project-specific journal storage
- * @returns path to project's private journal directory
- */
 export function resolveProjectJournalPath(): string {
-  return resolveJournalPath('.private-journal', true);
+  return resolveJournalBasePath();
 }
