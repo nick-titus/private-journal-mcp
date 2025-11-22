@@ -19,9 +19,9 @@ describe('detectProjectName', () => {
     expect(result).toBe('private-journal-mcp');
   });
 
-  it('should return directory basename when not in git repo', () => {
+  it('should return "general" when not in git repo', () => {
     const result = detectProjectName('/tmp/random-folder');
-    expect(result).toBe('random-folder');
+    expect(result).toBe('general');
   });
 
   it('should return "general" for home directory', () => {
