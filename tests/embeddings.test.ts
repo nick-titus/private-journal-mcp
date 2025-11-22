@@ -163,7 +163,7 @@ TypeScript interfaces are really powerful for maintaining code quality.`;
     });
 
     await journalManager.writeThoughts({
-      project: 'The React component architecture is working well'
+      projectNotes: 'The React component architecture is working well'
     });
 
     // Wait a moment for embeddings to be generated
@@ -186,7 +186,7 @@ TypeScript interfaces are really powerful for maintaining code quality.`;
   test('search service can filter by sections', async () => {
     // Add entries with different sections
     await journalManager.writeThoughts({
-      project: 'This project uses React and TypeScript'
+      projectNotes: 'This project uses React and TypeScript'
     });
 
     await journalManager.writeThoughts({

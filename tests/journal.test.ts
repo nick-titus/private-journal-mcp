@@ -190,7 +190,7 @@ describe('JournalManager', () => {
 
     test('includes project tag in frontmatter', async () => {
       await journalManager.writeThoughts({
-        project: 'Architecture uses React Query for data fetching'
+        projectNotes: 'Architecture uses React Query for data fetching'
       });
 
       const today = new Date();
@@ -225,7 +225,7 @@ describe('JournalManager', () => {
     test('writes all sections when provided', async () => {
       await journalManager.writeThoughts({
         user: 'Likes TypeScript strict mode',
-        project: 'Uses centralized state management',
+        projectNotes: 'Uses centralized state management',
         reflections: 'Good progress today'
       });
 
@@ -251,7 +251,7 @@ describe('JournalManager', () => {
       });
 
       await journalManager.writeThoughts({
-        project: 'Project specific data'
+        projectNotes: 'Project specific data'
       });
 
       const today = new Date();

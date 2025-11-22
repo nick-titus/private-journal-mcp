@@ -8,7 +8,7 @@ export interface JournalEntry {
 }
 
 export interface ProcessThoughtsRequest {
-  user?: string;         // Understanding the user - preferences, values, style, domains
-  project?: string;      // Project learnings - architecture, decisions, gotchas
-  reflections?: string;  // Session retrospective - what worked, what didn't
+  user?: string;             // Understanding the user - preferences, values, style, domains
+  projectNotes?: string;     // Project learnings - architecture, decisions, gotchas
+  reflections?: string;      // Session retrospective - what worked, what didn't
 }

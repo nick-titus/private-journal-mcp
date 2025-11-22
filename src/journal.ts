@@ -35,7 +35,7 @@ export class JournalManager {
 
   async writeThoughts(thoughts: {
     user?: string;
-    project?: string;
+    projectNotes?: string;
     reflections?: string;
   }): Promise<void> {
     const timestamp = new Date();
@@ -99,7 +99,7 @@ ${content}
 
   private formatThoughts(thoughts: {
     user?: string;
-    project?: string;
+    projectNotes?: string;
     reflections?: string;
   }, timestamp: Date, projectName: string): string {
     const timeDisplay = timestamp.toLocaleTimeString('en-US', {
@@ -120,8 +120,8 @@ ${content}
       sections.push(`## User\n\n${thoughts.user}`);
     }
 
-    if (thoughts.project) {
-      sections.push(`## Project\n\n${thoughts.project}`);
+    if (thoughts.projectNotes) {
+      sections.push(`## Project\n\n${thoughts.projectNotes}`);
     }
 
     if (thoughts.reflections) {

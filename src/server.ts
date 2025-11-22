@@ -37,7 +37,7 @@ export class PrivateJournalServer {
 
 Sections:
 - user: Understanding the user - their preferences, values, communication style, domain expertise
-- project: Project-specific learnings - architecture, decisions, gotchas, things tried and failed
+- projectNotes: Project-specific learnings - architecture, decisions, gotchas, things tried and failed
 - reflections: Session retrospective - what worked, what didn't, what to do differently next time
 
 Write to any combination of sections. Entries are automatically tagged with the current project.`,
@@ -48,7 +48,7 @@ Write to any combination of sections. Entries are automatically tagged with the 
                 type: 'string',
                 description: 'Observations about the user - preferences, values, style, domain context',
               },
-              project: {
+              projectNotes: {
                 type: 'string',
                 description: 'Project learnings - architecture, decisions, gotchas, failures',
               },
@@ -135,13 +135,13 @@ Write to any combination of sections. Entries are automatically tagged with the 
       if (request.params.name === 'process_thoughts') {
         const thoughts = {
           user: typeof args.user === 'string' ? args.user : undefined,
-          project: typeof args.project === 'string' ? args.project : undefined,
+          projectNotes: typeof args.projectNotes === 'string' ? args.projectNotes : undefined,
           reflections: typeof args.reflections === 'string' ? args.reflections : undefined,
         };
 
         const hasAnyContent = Object.values(thoughts).some(value => value !== undefined);
         if (!hasAnyContent) {
-          throw new Error('At least one section must be provided (user, project, or reflections)');
+          throw new Error('At least one section must be provided (user, projectNotes, or reflections)');
         }
 
         try {
