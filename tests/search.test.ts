@@ -5,7 +5,7 @@ import { SearchService, SearchResult, SearchOptions } from '../src/search.js';
 import { EmbeddingData } from '../src/embeddings.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { resolveEntriesPath } from '../src/paths.js';
+import * as os from 'os';
 
 // Mock the EmbeddingService to return consistent 5-dimensional vectors
 // This ensures test embeddings (5-dim) match query embeddings (5-dim)
@@ -35,12 +35,22 @@ jest.mock('../src/embeddings.js', () => {
 });
 
 describe('SearchService with project filtering', () => {
+  let tempDir: string;
   let testDir: string;
   let service: SearchService;
+  let originalHome: string | undefined;
 
   beforeAll(async () => {
-    // Create test directory structure
-    testDir = resolveEntriesPath();
+    // Create temp dir structure that mimics ~/.claude/.private-journal/entries
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'search-test-'));
+
+    // Mock HOME environment so resolveEntriesPath uses our temp dir
+    originalHome = process.env.HOME;
+    process.env.HOME = tempDir;
+
+    // The entries will go to ~/.claude/.private-journal/entries
+    testDir = path.join(tempDir, '.claude', '.private-journal', 'entries');
+
     const dateDir = '2024-01-15';
     const dayPath = path.join(testDir, dateDir);
     await fs.mkdir(dayPath, { recursive: true });
@@ -95,18 +105,15 @@ describe('SearchService with project filtering', () => {
   });
 
   afterAll(async () => {
-    // Clean up test files
-    try {
-      const dateDir = '2024-01-15';
-      const dayPath = path.join(testDir, dateDir);
-      const files = await fs.readdir(dayPath);
-      for (const file of files) {
-        await fs.unlink(path.join(dayPath, file));
-      }
-      await fs.rmdir(dayPath);
-    } catch (error) {
-      // Ignore cleanup errors
+    // Restore original HOME
+    if (originalHome !== undefined) {
+      process.env.HOME = originalHome;
+    } else {
+      delete process.env.HOME;
     }
+
+    // Clean up entire temp directory
+    await fs.rm(tempDir, { recursive: true, force: true });
   });
 
   describe('search', () => {
