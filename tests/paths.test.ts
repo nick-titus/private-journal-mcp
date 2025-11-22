@@ -76,21 +76,22 @@ describe('Legacy path exports (backwards compatibility)', () => {
     process.env = originalEnv;
   });
 
-  test('resolveJournalPath returns base path', () => {
+  // Legacy functions now point to entries directory for search compatibility
+  test('resolveJournalPath returns entries path', () => {
     const result = resolveJournalPath('.private-journal', true);
-    const expected = path.join(process.env.HOME || '', '.claude', '.private-journal');
+    const expected = path.join(process.env.HOME || '', '.claude', '.private-journal', 'entries');
     expect(result).toBe(expected);
   });
 
-  test('resolveUserJournalPath returns base path', () => {
+  test('resolveUserJournalPath returns entries path', () => {
     const result = resolveUserJournalPath();
-    const expected = path.join(process.env.HOME || '', '.claude', '.private-journal');
+    const expected = path.join(process.env.HOME || '', '.claude', '.private-journal', 'entries');
     expect(result).toBe(expected);
   });
 
-  test('resolveProjectJournalPath returns base path', () => {
+  test('resolveProjectJournalPath returns entries path', () => {
     const result = resolveProjectJournalPath();
-    const expected = path.join(process.env.HOME || '', '.claude', '.private-journal');
+    const expected = path.join(process.env.HOME || '', '.claude', '.private-journal', 'entries');
     expect(result).toBe(expected);
   });
 });

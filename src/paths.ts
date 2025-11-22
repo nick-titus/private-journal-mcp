@@ -53,14 +53,15 @@ export function resolveProjectSummaryPath(projectName: string): string {
 }
 
 // Legacy exports for backwards compatibility during migration
+// These now point to the entries directory for search compatibility
 export function resolveJournalPath(subdirectory: string = '.private-journal', includeCurrentDirectory: boolean = true): string {
-  return resolveJournalBasePath();
+  return resolveEntriesPath();
 }
 
 export function resolveUserJournalPath(): string {
-  return resolveJournalBasePath();
+  return resolveEntriesPath();
 }
 
 export function resolveProjectJournalPath(): string {
-  return resolveJournalBasePath();
+  return resolveEntriesPath();
 }

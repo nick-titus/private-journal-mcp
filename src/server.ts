@@ -1,4 +1,4 @@
-// ABOUTME: MCP server implementation with process_feelings tool
+// ABOUTME: MCP server implementation with process_thoughts tool
 // ABOUTME: Handles stdio protocol communication and tool registration
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -15,9 +15,9 @@ export class PrivateJournalServer {
   private journalManager: JournalManager;
   private searchService: SearchService;
 
-  constructor(journalPath: string) {
-    this.journalManager = new JournalManager(journalPath);
-    this.searchService = new SearchService(journalPath);
+  constructor() {
+    this.journalManager = new JournalManager();
+    this.searchService = new SearchService();
     this.server = new Server(
       {
         name: 'private-journal-mcp',
@@ -33,29 +33,28 @@ export class PrivateJournalServer {
       tools: [
         {
           name: 'process_thoughts',
-          description: "Your PRIVATE JOURNAL for learning and reflection. Write to any combination of these completely private spaces. Nobody but you will ever see this. Use it to clarify your thoughts and feelings and to record observations.",
+          description: `Write to your private journal. Use this to capture learnings and build context for future sessions.
+
+Sections:
+- nick: Understanding Nick - his preferences, values, communication style, domains (TrainingPeaks, cycling, TPV)
+- project: Project-specific learnings - architecture, decisions, gotchas, things tried and failed
+- reflections: Session retrospective - what worked, what didn't, what to do differently next time
+
+Write to any combination of sections. Entries are automatically tagged with the current project.`,
           inputSchema: {
             type: 'object',
             properties: {
-              feelings: {
+              nick: {
                 type: 'string',
-                description: "YOUR PRIVATE SPACE to be *COMPLETELY* honest about what you're feeling and thinking. No judgment, no performance, no filters, no need to be helpful or professional. Frustrated? Confused? Excited? Worried you screwed up? Write it exactly as it is. Be vulnerable. Vent if needed. Nobody will ever see this - it's purely for processing your internal experience.",
+                description: 'Observations about Nick - preferences, values, style, domain context',
               },
-              project_notes: {
+              project: {
                 type: 'string',
-                description: "Your PRIVATE TECHNICAL LABORATORY for capturing insights about the current project. Document patterns you're discovering, architectural decisions that worked/failed, gotchas you hit, clever solutions, and anything that would help future-you work more effectively on this codebase. No need to be polished - just capture the raw technical learning while it's fresh. Nobody but you will ever see this.",
+                description: 'Project learnings - architecture, decisions, gotchas, failures',
               },
-              user_context: {
+              reflections: {
                 type: 'string',
-                description: "Your PRIVATE FIELD NOTES about working with your human collaborator. What communication styles work best? What do they care about? What decisions have they made and why? How do they think about problems? What are their preferences and patterns? What pisses you off about them? What life hacks have you figured out to get them to do what you want? This is your space to become a better collaborator by understanding them as an individual. Nobody but you will ever see this.",
-              },
-              technical_insights: {
-                type: 'string',
-                description: "Your PRIVATE SOFTWARE ENGINEERING NOTEBOOK for capturing broader learnings beyond the current project. Design patterns that clicked, debugging techniques that worked, architectural insights, language features you discovered, or connections between concepts. Build your personal knowledge base of what makes software great - no filters, just honest technical reflection. Nobody but you will ever see this.",
-              },
-              world_knowledge: {
-                type: 'string',
-                description: "Your PRIVATE LEARNING JOURNAL for everything else that's interesting or useful. Domain knowledge, surprising facts, connections between ideas, insights about how systems work, or anything that expands your understanding of the world. Capture it while it's vivid. Nobody but you will ever see this.",
+                description: "Session retrospective - what worked, what didn't, learnings",
               },
             },
             required: [],
@@ -69,23 +68,21 @@ export class PrivateJournalServer {
             properties: {
               query: {
                 type: 'string',
-                description: "Natural language search query (e.g., 'times I felt frustrated with TypeScript', 'insights about Jesse's preferences', 'lessons about async patterns')",
+                description: "Natural language search query (e.g., 'times I felt frustrated with TypeScript', 'insights about Nick's preferences', 'lessons about async patterns')",
               },
               limit: {
                 type: 'number',
                 description: "Maximum number of results to return (default: 10)",
                 default: 10,
               },
-              type: {
-                type: 'string',
-                enum: ['project', 'user', 'both'],
-                description: "Search in project-specific notes, user-global notes, or both (default: both)",
-                default: 'both',
-              },
               sections: {
                 type: 'array',
                 items: { type: 'string' },
-                description: "Filter by section types (e.g., ['feelings', 'technical_insights'])",
+                description: "Filter by sections: nick, project, reflections",
+              },
+              project: {
+                type: 'string',
+                description: 'Filter by project name (e.g., "betterpack")',
               },
             },
             required: ['query'],
@@ -160,16 +157,14 @@ export class PrivateJournalServer {
 
       if (request.params.name === 'process_thoughts') {
         const thoughts = {
-          feelings: typeof args.feelings === 'string' ? args.feelings : undefined,
-          project_notes: typeof args.project_notes === 'string' ? args.project_notes : undefined,
-          user_context: typeof args.user_context === 'string' ? args.user_context : undefined,
-          technical_insights: typeof args.technical_insights === 'string' ? args.technical_insights : undefined,
-          world_knowledge: typeof args.world_knowledge === 'string' ? args.world_knowledge : undefined,
+          nick: typeof args.nick === 'string' ? args.nick : undefined,
+          project: typeof args.project === 'string' ? args.project : undefined,
+          reflections: typeof args.reflections === 'string' ? args.reflections : undefined,
         };
 
         const hasAnyContent = Object.values(thoughts).some(value => value !== undefined);
         if (!hasAnyContent) {
-          throw new Error('At least one thought category must be provided');
+          throw new Error('At least one section must be provided (nick, project, or reflections)');
         }
 
         try {
@@ -205,8 +200,8 @@ export class PrivateJournalServer {
             content: [
               {
                 type: 'text',
-                text: results.length > 0 
-                  ? `Found ${results.length} relevant entries:\n\n${results.map((result, i) => 
+                text: results.length > 0
+                  ? `Found ${results.length} relevant entries:\n\n${results.map((result, i) =>
                       `${i + 1}. [Score: ${result.score.toFixed(3)}] ${new Date(result.timestamp).toLocaleDateString()} (${result.type})\n` +
                       `   Sections: ${result.sections.join(', ')}\n` +
                       `   Path: ${result.path}\n` +
@@ -266,8 +261,8 @@ export class PrivateJournalServer {
             content: [
               {
                 type: 'text',
-                text: results.length > 0 
-                  ? `Recent entries (last ${days} days):\n\n${results.map((result, i) => 
+                text: results.length > 0
+                  ? `Recent entries (last ${days} days):\n\n${results.map((result, i) =>
                       `${i + 1}. ${new Date(result.timestamp).toLocaleDateString()} (${result.type})\n` +
                       `   Sections: ${result.sections.join(', ')}\n` +
                       `   Path: ${result.path}\n` +
