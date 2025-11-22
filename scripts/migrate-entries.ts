@@ -230,3 +230,6 @@ main()
     console.error('Migration failed:', error);
     process.exit(1);
   });
+
+// Export pure functions for testing
+export { extractProjectFromPath, expandHome };
