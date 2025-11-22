@@ -113,11 +113,9 @@ Write to any combination of sections. Entries are automatically tagged with the 
                 description: "Maximum number of entries to return (default: 10)",
                 default: 10,
               },
-              type: {
+              project: {
                 type: 'string',
-                enum: ['project', 'user', 'both'],
-                description: "List project-specific notes, user-global notes, or both (default: both)",
-                default: 'both',
+                description: 'Filter by project name (e.g., "betterpack"). If not specified, returns entries from all projects.',
               },
               days: {
                 type: 'number',
@@ -190,7 +188,7 @@ Write to any combination of sections. Entries are automatically tagged with the 
 
         const options = {
           limit: typeof args.limit === 'number' ? args.limit : 10,
-          type: typeof args.type === 'string' ? args.type as 'project' | 'user' | 'both' : 'both',
+          project: typeof args.project === 'string' ? args.project : undefined,
           sections: Array.isArray(args.sections) ? args.sections.filter(s => typeof s === 'string') : undefined,
         };
 
@@ -202,7 +200,7 @@ Write to any combination of sections. Entries are automatically tagged with the 
                 type: 'text',
                 text: results.length > 0
                   ? `Found ${results.length} relevant entries:\n\n${results.map((result, i) =>
-                      `${i + 1}. [Score: ${result.score.toFixed(3)}] ${new Date(result.timestamp).toLocaleDateString()} (${result.type})\n` +
+                      `${i + 1}. [Score: ${result.score.toFixed(3)}] ${new Date(result.timestamp).toLocaleDateString()}${result.project ? ` (${result.project})` : ''}\n` +
                       `   Sections: ${result.sections.join(', ')}\n` +
                       `   Path: ${result.path}\n` +
                       `   Excerpt: ${result.excerpt}\n`
@@ -244,14 +242,14 @@ Write to any combination of sections. Entries are automatically tagged with the 
       if (request.params.name === 'list_recent_entries') {
         const days = typeof args?.days === 'number' ? args.days : 30;
         const limit = typeof args?.limit === 'number' ? args.limit : 10;
-        const type = typeof args?.type === 'string' ? args.type as 'project' | 'user' | 'both' : 'both';
+        const project = typeof args?.project === 'string' ? args.project : undefined;
 
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - days);
 
         const options = {
           limit,
-          type,
+          project,
           dateRange: { start: startDate }
         };
 
@@ -263,7 +261,7 @@ Write to any combination of sections. Entries are automatically tagged with the 
                 type: 'text',
                 text: results.length > 0
                   ? `Recent entries (last ${days} days):\n\n${results.map((result, i) =>
-                      `${i + 1}. ${new Date(result.timestamp).toLocaleDateString()} (${result.type})\n` +
+                      `${i + 1}. ${new Date(result.timestamp).toLocaleDateString()}${result.project ? ` (${result.project})` : ''}\n` +
                       `   Sections: ${result.sections.join(', ')}\n` +
                       `   Path: ${result.path}\n` +
                       `   Excerpt: ${result.excerpt}\n`
