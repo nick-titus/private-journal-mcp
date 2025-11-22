@@ -7,14 +7,6 @@ export interface JournalEntry {
   filePath: string;
 }
 
-export interface ServerConfig {
-  journalPath: string;
-}
-
-export interface ProcessFeelingsRequest {
-  diary_entry: string;
-}
-
 export interface ProcessThoughtsRequest {
   nick?: string;         // Understanding Nick - preferences, values, style, domains
   project?: string;      // Project learnings - architecture, decisions, gotchas
