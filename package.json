@@ -15,7 +15,9 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "lint": "eslint src/**/*.ts",
-    "format": "prettier --write src/**/*.ts"
+    "format": "prettier --write src/**/*.ts",
+    "migrate": "npx tsx scripts/migrate-entries.ts",
+    "migrate:dry-run": "npx tsx scripts/migrate-entries.ts --dry-run"
   },
   "keywords": [
     "mcp",

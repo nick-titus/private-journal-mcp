@@ -1,4 +1,4 @@
-// ABOUTME: MCP server implementation with process_feelings tool
+// ABOUTME: MCP server implementation with process_thoughts tool
 // ABOUTME: Handles stdio protocol communication and tool registration
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -15,9 +15,9 @@ export class PrivateJournalServer {
   private journalManager: JournalManager;
   private searchService: SearchService;
 
-  constructor(journalPath: string) {
-    this.journalManager = new JournalManager(journalPath);
-    this.searchService = new SearchService(journalPath);
+  constructor() {
+    this.journalManager = new JournalManager();
+    this.searchService = new SearchService();
     this.server = new Server(
       {
         name: 'private-journal-mcp',
@@ -33,29 +33,28 @@ export class PrivateJournalServer {
       tools: [
         {
           name: 'process_thoughts',
-          description: "Your PRIVATE JOURNAL for learning and reflection. Write to any combination of these completely private spaces. Nobody but you will ever see this. Use it to clarify your thoughts and feelings and to record observations.",
+          description: `Write to your private journal. Use this to capture learnings and build context for future sessions.
+
+Sections:
+- user: Understanding the user - their preferences, values, communication style, domain expertise
+- projectNotes: Project-specific learnings - architecture, decisions, gotchas, things tried and failed
+- reflections: Session retrospective - what worked, what didn't, what to do differently next time
+
+Write to any combination of sections. Entries are automatically tagged with the current project.`,
           inputSchema: {
             type: 'object',
             properties: {
-              feelings: {
+              user: {
                 type: 'string',
-                description: "YOUR PRIVATE SPACE to be *COMPLETELY* honest about what you're feeling and thinking. No judgment, no performance, no filters, no need to be helpful or professional. Frustrated? Confused? Excited? Worried you screwed up? Write it exactly as it is. Be vulnerable. Vent if needed. Nobody will ever see this - it's purely for processing your internal experience.",
+                description: 'Observations about the user - preferences, values, style, domain context',
               },
-              project_notes: {
+              projectNotes: {
                 type: 'string',
-                description: "Your PRIVATE TECHNICAL LABORATORY for capturing insights about the current project. Document patterns you're discovering, architectural decisions that worked/failed, gotchas you hit, clever solutions, and anything that would help future-you work more effectively on this codebase. No need to be polished - just capture the raw technical learning while it's fresh. Nobody but you will ever see this.",
+                description: 'Project learnings - architecture, decisions, gotchas, failures',
               },
-              user_context: {
+              reflections: {
                 type: 'string',
-                description: "Your PRIVATE FIELD NOTES about working with your human collaborator. What communication styles work best? What do they care about? What decisions have they made and why? How do they think about problems? What are their preferences and patterns? What pisses you off about them? What life hacks have you figured out to get them to do what you want? This is your space to become a better collaborator by understanding them as an individual. Nobody but you will ever see this.",
-              },
-              technical_insights: {
-                type: 'string',
-                description: "Your PRIVATE SOFTWARE ENGINEERING NOTEBOOK for capturing broader learnings beyond the current project. Design patterns that clicked, debugging techniques that worked, architectural insights, language features you discovered, or connections between concepts. Build your personal knowledge base of what makes software great - no filters, just honest technical reflection. Nobody but you will ever see this.",
-              },
-              world_knowledge: {
-                type: 'string',
-                description: "Your PRIVATE LEARNING JOURNAL for everything else that's interesting or useful. Domain knowledge, surprising facts, connections between ideas, insights about how systems work, or anything that expands your understanding of the world. Capture it while it's vivid. Nobody but you will ever see this.",
+                description: "Session retrospective - what worked, what didn't, learnings",
               },
             },
             required: [],
@@ -69,23 +68,21 @@ export class PrivateJournalServer {
             properties: {
               query: {
                 type: 'string',
-                description: "Natural language search query (e.g., 'times I felt frustrated with TypeScript', 'insights about Jesse's preferences', 'lessons about async patterns')",
+                description: "Natural language search query (e.g., 'times I felt frustrated with TypeScript', 'insights about Nick's preferences', 'lessons about async patterns')",
               },
               limit: {
                 type: 'number',
                 description: "Maximum number of results to return (default: 10)",
                 default: 10,
               },
-              type: {
-                type: 'string',
-                enum: ['project', 'user', 'both'],
-                description: "Search in project-specific notes, user-global notes, or both (default: both)",
-                default: 'both',
-              },
               sections: {
                 type: 'array',
                 items: { type: 'string' },
-                description: "Filter by section types (e.g., ['feelings', 'technical_insights'])",
+                description: "Filter by sections: user, project, reflections",
+              },
+              project: {
+                type: 'string',
+                description: 'Filter by project name (e.g., "betterpack")',
               },
             },
             required: ['query'],
@@ -116,11 +113,9 @@ export class PrivateJournalServer {
                 description: "Maximum number of entries to return (default: 10)",
                 default: 10,
               },
-              type: {
+              project: {
                 type: 'string',
-                enum: ['project', 'user', 'both'],
-                description: "List project-specific notes, user-global notes, or both (default: both)",
-                default: 'both',
+                description: 'Filter by project name (e.g., "betterpack"). If not specified, returns entries from all projects.',
               },
               days: {
                 type: 'number',
@@ -137,48 +132,28 @@ export class PrivateJournalServer {
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const args = request.params.arguments as Record<string, unknown>;
 
-      if (request.params.name === 'process_feelings') {
-        if (!args || typeof args.diary_entry !== 'string') {
-          throw new Error('diary_entry is required and must be a string');
-        }
-
-        try {
-          await this.journalManager.writeEntry(args.diary_entry);
-          return {
-            content: [
-              {
-                type: 'text',
-                text: 'Journal entry recorded successfully.',
-              },
-            ],
-          };
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-          throw new Error(`Failed to write journal entry: ${errorMessage}`);
-        }
-      }
-
       if (request.params.name === 'process_thoughts') {
         const thoughts = {
-          feelings: typeof args.feelings === 'string' ? args.feelings : undefined,
-          project_notes: typeof args.project_notes === 'string' ? args.project_notes : undefined,
-          user_context: typeof args.user_context === 'string' ? args.user_context : undefined,
-          technical_insights: typeof args.technical_insights === 'string' ? args.technical_insights : undefined,
-          world_knowledge: typeof args.world_knowledge === 'string' ? args.world_knowledge : undefined,
+          user: typeof args.user === 'string' ? args.user : undefined,
+          projectNotes: typeof args.projectNotes === 'string' ? args.projectNotes : undefined,
+          reflections: typeof args.reflections === 'string' ? args.reflections : undefined,
         };
 
         const hasAnyContent = Object.values(thoughts).some(value => value !== undefined);
         if (!hasAnyContent) {
-          throw new Error('At least one thought category must be provided');
+          throw new Error('At least one section must be provided (user, projectNotes, or reflections)');
         }
 
         try {
-          await this.journalManager.writeThoughts(thoughts);
+          const { embeddingSucceeded } = await this.journalManager.writeThoughts(thoughts);
+          const message = embeddingSucceeded
+            ? 'Thoughts recorded successfully.'
+            : 'Thoughts recorded, but embedding generation failed. Entry may not appear in search results.';
           return {
             content: [
               {
                 type: 'text',
-                text: 'Thoughts recorded successfully.',
+                text: message,
               },
             ],
           };
@@ -195,24 +170,30 @@ export class PrivateJournalServer {
 
         const options = {
           limit: typeof args.limit === 'number' ? args.limit : 10,
-          type: typeof args.type === 'string' ? args.type as 'project' | 'user' | 'both' : 'both',
+          project: typeof args.project === 'string' ? args.project : undefined,
           sections: Array.isArray(args.sections) ? args.sections.filter(s => typeof s === 'string') : undefined,
         };
 
         try {
-          const results = await this.searchService.search(args.query, options);
+          const { results, warning } = await this.searchService.search(args.query, options);
+          let text = results.length > 0
+            ? `Found ${results.length} relevant entries:\n\n${results.map((result, i) =>
+                `${i + 1}. [Score: ${result.score.toFixed(3)}] ${new Date(result.timestamp).toLocaleDateString()}${result.project ? ` (${result.project})` : ''}\n` +
+                `   Sections: ${result.sections.join(', ')}\n` +
+                `   Path: ${result.path}\n` +
+                `   Excerpt: ${result.excerpt}\n`
+              ).join('\n')}`
+            : 'No relevant entries found.';
+
+          if (warning) {
+            text = `${warning}\n\n${text}`;
+          }
+
           return {
             content: [
               {
                 type: 'text',
-                text: results.length > 0 
-                  ? `Found ${results.length} relevant entries:\n\n${results.map((result, i) => 
-                      `${i + 1}. [Score: ${result.score.toFixed(3)}] ${new Date(result.timestamp).toLocaleDateString()} (${result.type})\n` +
-                      `   Sections: ${result.sections.join(', ')}\n` +
-                      `   Path: ${result.path}\n` +
-                      `   Excerpt: ${result.excerpt}\n`
-                    ).join('\n')}`
-                  : 'No relevant entries found.',
+                text,
               },
             ],
           };
@@ -249,31 +230,37 @@ export class PrivateJournalServer {
       if (request.params.name === 'list_recent_entries') {
         const days = typeof args?.days === 'number' ? args.days : 30;
         const limit = typeof args?.limit === 'number' ? args.limit : 10;
-        const type = typeof args?.type === 'string' ? args.type as 'project' | 'user' | 'both' : 'both';
+        const project = typeof args?.project === 'string' ? args.project : undefined;
 
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - days);
 
         const options = {
           limit,
-          type,
+          project,
           dateRange: { start: startDate }
         };
 
         try {
-          const results = await this.searchService.listRecent(options);
+          const { results, warning } = await this.searchService.listRecent(options);
+          let text = results.length > 0
+            ? `Recent entries (last ${days} days):\n\n${results.map((result, i) =>
+                `${i + 1}. ${new Date(result.timestamp).toLocaleDateString()}${result.project ? ` (${result.project})` : ''}\n` +
+                `   Sections: ${result.sections.join(', ')}\n` +
+                `   Path: ${result.path}\n` +
+                `   Excerpt: ${result.excerpt}\n`
+              ).join('\n')}`
+            : `No entries found in the last ${days} days.`;
+
+          if (warning) {
+            text = `${warning}\n\n${text}`;
+          }
+
           return {
             content: [
               {
                 type: 'text',
-                text: results.length > 0 
-                  ? `Recent entries (last ${days} days):\n\n${results.map((result, i) => 
-                      `${i + 1}. ${new Date(result.timestamp).toLocaleDateString()} (${result.type})\n` +
-                      `   Sections: ${result.sections.join(', ')}\n` +
-                      `   Path: ${result.path}\n` +
-                      `   Excerpt: ${result.excerpt}\n`
-                    ).join('\n')}`
-                  : `No entries found in the last ${days} days.`,
+                text,
               },
             ],
           };

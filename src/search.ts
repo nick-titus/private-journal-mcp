@@ -1,10 +1,11 @@
 // ABOUTME: Journal search functionality with vector similarity and text matching
-// ABOUTME: Provides unified search across project and user journal entries
+// ABOUTME: Provides unified search across all journal entries with project filtering
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { EmbeddingService, EmbeddingData } from './embeddings.js';
-import { resolveUserJournalPath, resolveProjectJournalPath } from './paths.js';
+import { resolveEntriesPath } from './paths.js';
+import { isNodeError } from './types.js';
 
 export interface SearchResult {
   path: string;
@@ -13,7 +14,8 @@ export interface SearchResult {
   sections: string[];
   timestamp: number;
   excerpt: string;
-  type: 'project' | 'user';
+  project?: string;  // Project name from centralized storage
+  warning?: string;  // Warning message if some embeddings failed to load
 }
 
 export interface SearchOptions {
@@ -24,51 +26,44 @@ export interface SearchOptions {
     start?: Date;
     end?: Date;
   };
-  type?: 'project' | 'user' | 'both';
+  project?: string;  // Filter by project name
 }
 
 export class SearchService {
   private embeddingService: EmbeddingService;
-  private projectPath: string;
-  private userPath: string;
+  private entriesPath: string;
 
-  constructor(projectPath?: string, userPath?: string) {
+  constructor() {
     this.embeddingService = EmbeddingService.getInstance();
-    this.projectPath = projectPath || resolveProjectJournalPath();
-    this.userPath = userPath || resolveUserJournalPath();
+    this.entriesPath = resolveEntriesPath();
   }
 
-  async search(query: string, options: SearchOptions = {}): Promise<SearchResult[]> {
+  async search(query: string, options: SearchOptions = {}): Promise<{ results: SearchResult[]; warning?: string }> {
     const {
       limit = 10,
       minScore = 0.1,
       sections,
       dateRange,
-      type = 'both'
+      project
     } = options;
 
     // Generate query embedding
     const queryEmbedding = await this.embeddingService.generateEmbedding(query);
 
-    // Collect all embeddings
-    const allEmbeddings: Array<EmbeddingData & { type: 'project' | 'user' }> = [];
-
-    if (type === 'both' || type === 'project') {
-      const projectEmbeddings = await this.loadEmbeddingsFromPath(this.projectPath, 'project');
-      allEmbeddings.push(...projectEmbeddings);
-    }
-
-    if (type === 'both' || type === 'user') {
-      const userEmbeddings = await this.loadEmbeddingsFromPath(this.userPath, 'user');
-      allEmbeddings.push(...userEmbeddings);
-    }
+    // Collect all embeddings from centralized storage
+    const { embeddings: allEmbeddings, failedCount } = await this.loadEmbeddingsFromPath(this.entriesPath);
 
     // Filter by criteria
     const filtered = allEmbeddings.filter(embedding => {
+      // Filter by project if specified
+      if (project && embedding.project !== project) {
+        return false;
+      }
+
       // Filter by sections if specified
       if (sections && sections.length > 0) {
-        const hasMatchingSection = sections.some(section => 
-          embedding.sections.some(embeddingSection => 
+        const hasMatchingSection = sections.some(section =>
+          embedding.sections.some(embeddingSection =>
             embeddingSection.toLowerCase().includes(section.toLowerCase())
           )
         );
@@ -90,7 +85,7 @@ export class SearchService {
       .map(embedding => {
         const score = this.embeddingService.cosineSimilarity(queryEmbedding, embedding.embedding);
         const excerpt = this.generateExcerpt(embedding.text, query);
-        
+
         return {
           path: embedding.path,
           score,
@@ -98,42 +93,48 @@ export class SearchService {
           sections: embedding.sections,
           timestamp: embedding.timestamp,
           excerpt,
-          type: embedding.type
+          project: embedding.project
         };
       })
       .filter(result => result.score >= minScore)
       .sort((a, b) => b.score - a.score)
       .slice(0, limit);
 
-    return results;
+    // Add warning if many embeddings failed to load
+    let warning: string | undefined;
+    if (failedCount > 0) {
+      warning = `Warning: ${failedCount} embedding(s) failed to load. Some entries may not appear in search results.`;
+    }
+
+    return { results, warning };
   }
 
-  async listRecent(options: SearchOptions = {}): Promise<SearchResult[]> {
+  async listRecent(options: SearchOptions = {}): Promise<{ results: SearchResult[]; warning?: string }> {
     const {
       limit = 10,
-      type = 'both',
+      project,
       dateRange
     } = options;
 
-    const allEmbeddings: Array<EmbeddingData & { type: 'project' | 'user' }> = [];
+    // Load all embeddings from centralized storage
+    const { embeddings: allEmbeddings, failedCount } = await this.loadEmbeddingsFromPath(this.entriesPath);
 
-    if (type === 'both' || type === 'project') {
-      const projectEmbeddings = await this.loadEmbeddingsFromPath(this.projectPath, 'project');
-      allEmbeddings.push(...projectEmbeddings);
-    }
+    // Filter by criteria
+    const filtered = allEmbeddings.filter(embedding => {
+      // Filter by project if specified
+      if (project && embedding.project !== project) {
+        return false;
+      }
 
-    if (type === 'both' || type === 'user') {
-      const userEmbeddings = await this.loadEmbeddingsFromPath(this.userPath, 'user');
-      allEmbeddings.push(...userEmbeddings);
-    }
+      // Filter by date range
+      if (dateRange) {
+        const entryDate = new Date(embedding.timestamp);
+        if (dateRange.start && entryDate < dateRange.start) return false;
+        if (dateRange.end && entryDate > dateRange.end) return false;
+      }
 
-    // Filter by date range
-    const filtered = dateRange ? allEmbeddings.filter(embedding => {
-      const entryDate = new Date(embedding.timestamp);
-      if (dateRange.start && entryDate < dateRange.start) return false;
-      if (dateRange.end && entryDate > dateRange.end) return false;
       return true;
-    }) : allEmbeddings;
+    });
 
     // Sort by timestamp (most recent first) and limit
     const results: SearchResult[] = filtered
@@ -146,36 +147,40 @@ export class SearchService {
         sections: embedding.sections,
         timestamp: embedding.timestamp,
         excerpt: this.generateExcerpt(embedding.text, '', 150),
-        type: embedding.type
+        project: embedding.project
       }));
 
-    return results;
+    // Add warning if many embeddings failed to load
+    let warning: string | undefined;
+    if (failedCount > 0) {
+      warning = `Warning: ${failedCount} embedding(s) failed to load. Some entries may not appear in results.`;
+    }
+
+    return { results, warning };
   }
 
   async readEntry(filePath: string): Promise<string | null> {
     try {
       return await fs.readFile(filePath, 'utf8');
     } catch (error) {
-      if ((error as any)?.code === 'ENOENT') {
+      if (isNodeError(error) && error.code === 'ENOENT') {
         return null;
       }
       throw error;
     }
   }
 
-  private async loadEmbeddingsFromPath(
-    basePath: string, 
-    type: 'project' | 'user'
-  ): Promise<Array<EmbeddingData & { type: 'project' | 'user' }>> {
-    const embeddings: Array<EmbeddingData & { type: 'project' | 'user' }> = [];
+  private async loadEmbeddingsFromPath(basePath: string): Promise<{ embeddings: EmbeddingData[]; failedCount: number }> {
+    const embeddings: EmbeddingData[] = [];
+    let failedCount = 0;
 
     try {
       const dayDirs = await fs.readdir(basePath);
-      
+
       for (const dayDir of dayDirs) {
         const dayPath = path.join(basePath, dayDir);
         const stat = await fs.stat(dayPath);
-        
+
         if (!stat.isDirectory() || !dayDir.match(/^\d{4}-\d{2}-\d{2}$/)) {
           continue;
         }
@@ -187,22 +192,25 @@ export class SearchService {
           try {
             const embeddingPath = path.join(dayPath, embeddingFile);
             const content = await fs.readFile(embeddingPath, 'utf8');
-            const embeddingData = JSON.parse(content);
-            embeddings.push({ ...embeddingData, type });
+            const embeddingData: EmbeddingData = JSON.parse(content);
+            embeddings.push(embeddingData);
           } catch (error) {
             console.error(`Failed to load embedding ${embeddingFile}:`, error);
+            failedCount++;
             // Continue with other files
           }
         }
       }
     } catch (error) {
-      if ((error as any)?.code !== 'ENOENT') {
-        console.error(`Failed to read embeddings from ${basePath}:`, error);
+      if (isNodeError(error) && error.code === 'ENOENT') {
+        // Directory doesn't exist - return empty array (this is fine for new installations)
+        return { embeddings: [], failedCount: 0 };
       }
-      // Return empty array if directory doesn't exist
+      // Re-throw non-ENOENT errors so users know something is wrong
+      throw new Error(`Failed to read embeddings from ${basePath}: ${error instanceof Error ? error.message : error}`);
     }
 
-    return embeddings;
+    return { embeddings, failedCount };
   }
 
   private generateExcerpt(text: string, query: string, maxLength: number = 200): string {

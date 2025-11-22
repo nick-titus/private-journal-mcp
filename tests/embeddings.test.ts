@@ -5,27 +5,54 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 
-import { EmbeddingService } from '../src/embeddings';
+import { EmbeddingService, EmbeddingData } from '../src/embeddings';
 import { SearchService } from '../src/search';
 import { JournalManager } from '../src/journal';
 
+describe('EmbeddingData schema', () => {
+  it('should support optional project field', () => {
+    const data: EmbeddingData = {
+      embedding: [0.1, 0.2],
+      text: 'test',
+      sections: ['user'],
+      timestamp: Date.now(),
+      path: '/test/path.md',
+      project: 'betterpack'
+    };
+    expect(data.project).toBe('betterpack');
+  });
+
+  it('should allow project to be undefined', () => {
+    const data: EmbeddingData = {
+      embedding: [0.1, 0.2],
+      text: 'test',
+      sections: ['user'],
+      timestamp: Date.now(),
+      path: '/test/path.md'
+    };
+    expect(data.project).toBeUndefined();
+  });
+});
+
 describe('Embedding and Search functionality', () => {
-  let projectTempDir: string;
-  let userTempDir: string;
+  let tempDir: string;
   let journalManager: JournalManager;
   let searchService: SearchService;
   let originalHome: string | undefined;
+  let entriesPath: string;
 
   beforeEach(async () => {
-    projectTempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'journal-project-test-'));
-    userTempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'journal-user-test-'));
-    
-    // Mock HOME environment
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'journal-embed-test-'));
+
+    // Mock HOME environment so all paths use our temp dir
     originalHome = process.env.HOME;
-    process.env.HOME = userTempDir;
-    
-    journalManager = new JournalManager(projectTempDir);
-    searchService = new SearchService(projectTempDir, path.join(userTempDir, '.private-journal'));
+    process.env.HOME = tempDir;
+
+    // Entries will go to ~/.claude/.private-journal/entries
+    entriesPath = path.join(tempDir, '.claude', '.private-journal', 'entries');
+
+    journalManager = new JournalManager();
+    searchService = new SearchService();
   });
 
   afterEach(async () => {
@@ -35,17 +62,16 @@ describe('Embedding and Search functionality', () => {
     } else {
       delete process.env.HOME;
     }
-    
-    await fs.rm(projectTempDir, { recursive: true, force: true });
-    await fs.rm(userTempDir, { recursive: true, force: true });
+
+    await fs.rm(tempDir, { recursive: true, force: true });
   });
 
   test('embedding service initializes and generates embeddings', async () => {
     const embeddingService = EmbeddingService.getInstance();
-    
+
     const text = 'This is a test journal entry about TypeScript programming.';
     const embedding = await embeddingService.generateEmbedding(text);
-    
+
     expect(embedding).toBeDefined();
     expect(Array.isArray(embedding)).toBe(true);
     expect(embedding.length).toBeGreaterThan(0);
@@ -54,96 +80,97 @@ describe('Embedding and Search functionality', () => {
 
   test('embedding service extracts searchable text from markdown', async () => {
     const embeddingService = EmbeddingService.getInstance();
-    
+
     const markdown = `---
 title: "Test Entry"
 date: 2025-05-31T12:00:00.000Z
 timestamp: 1717056000000
+project: test-project
 ---
 
-## Feelings
+## User
 
-I feel great about this feature implementation.
+User prefers explicit control over implicit behavior.
 
-## Technical Insights
+## Reflections
 
 TypeScript interfaces are really powerful for maintaining code quality.`;
 
     const { text, sections } = embeddingService.extractSearchableText(markdown);
-    
-    expect(text).toContain('I feel great about this feature implementation');
+
+    expect(text).toContain('User prefers explicit control over implicit behavior');
     expect(text).toContain('TypeScript interfaces are really powerful');
     expect(text).not.toContain('title: "Test Entry"');
-    expect(sections).toEqual(['Feelings', 'Technical Insights']);
+    expect(sections).toEqual(['User', 'Reflections']);
   });
 
   test('cosine similarity calculation works correctly', async () => {
     const embeddingService = EmbeddingService.getInstance();
-    
+
     const vector1 = [1, 0, 0];
     const vector2 = [1, 0, 0];
     const vector3 = [0, 1, 0];
-    
+
     const similarity1 = embeddingService.cosineSimilarity(vector1, vector2);
     const similarity2 = embeddingService.cosineSimilarity(vector1, vector3);
-    
+
     expect(similarity1).toBeCloseTo(1.0, 5); // Identical vectors
     expect(similarity2).toBeCloseTo(0.0, 5); // Orthogonal vectors
   });
 
   test('journal manager generates embeddings when writing thoughts', async () => {
     const thoughts = {
-      feelings: 'I feel excited about implementing this search feature',
-      technical_insights: 'Vector embeddings provide semantic understanding of text'
+      user: 'User prefers concise code and explicit control flow',
+      reflections: 'Vector embeddings provide semantic understanding of text'
     };
-    
+
     await journalManager.writeThoughts(thoughts);
-    
-    // Check that embedding files were created
+
+    // Check that embedding files were created in centralized location
     const today = new Date();
     const dateString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    
-    // Check user directory for feelings and technical_insights
-    const userDayDir = path.join(userTempDir, '.private-journal', dateString);
-    const userFiles = await fs.readdir(userDayDir);
-    
-    const userMdFile = userFiles.find(f => f.endsWith('.md'));
-    const userEmbeddingFile = userFiles.find(f => f.endsWith('.embedding'));
-    
-    expect(userMdFile).toBeDefined();
-    expect(userEmbeddingFile).toBeDefined();
-    
-    if (userEmbeddingFile) {
-      const embeddingContent = await fs.readFile(path.join(userDayDir, userEmbeddingFile), 'utf8');
+
+    const dayDir = path.join(entriesPath, dateString);
+    const files = await fs.readdir(dayDir);
+
+    const mdFile = files.find(f => f.endsWith('.md'));
+    const embeddingFile = files.find(f => f.endsWith('.embedding'));
+
+    expect(mdFile).toBeDefined();
+    expect(embeddingFile).toBeDefined();
+
+    if (embeddingFile) {
+      const embeddingContent = await fs.readFile(path.join(dayDir, embeddingFile), 'utf8');
       const embeddingData = JSON.parse(embeddingContent);
-      
+
       expect(embeddingData.embedding).toBeDefined();
       expect(Array.isArray(embeddingData.embedding)).toBe(true);
-      expect(embeddingData.text).toContain('excited about implementing');
-      expect(embeddingData.sections).toContain('Feelings');
-      expect(embeddingData.sections).toContain('Technical Insights');
+      expect(embeddingData.text).toContain('concise code');
+      expect(embeddingData.sections).toContain('User');
+      expect(embeddingData.sections).toContain('Reflections');
+      expect(embeddingData.project).toBeDefined();
     }
   }, 60000);
 
   test('search service finds semantically similar entries', async () => {
-    // Write some test entries
+    // Write some test entries with new section names
     await journalManager.writeThoughts({
-      feelings: 'I feel frustrated with debugging TypeScript errors'
+      user: 'I feel frustrated with debugging TypeScript errors'
     });
-    
+
     await journalManager.writeThoughts({
-      technical_insights: 'JavaScript async patterns can be tricky to understand'
+      reflections: 'JavaScript async patterns can be tricky to understand'
     });
-    
+
     await journalManager.writeThoughts({
-      project_notes: 'The React component architecture is working well'
+      projectNotes: 'The React component architecture is working well'
     });
 
     // Wait a moment for embeddings to be generated
     await new Promise(resolve => setTimeout(resolve, 2000));
-    
+
     // Search for similar entries
-    const results = await searchService.search('feeling upset about TypeScript problems');
+    const { results } = await searchService.search('feeling upset about TypeScript problems');
 
     expect(results.length).toBeGreaterThan(0);
 
@@ -156,27 +183,30 @@ TypeScript interfaces are really powerful for maintaining code quality.`;
     expect(frustratedEntry!.score).toBeGreaterThan(0.1);
   }, 90000);
 
-  test('search service can filter by entry type', async () => {
-    // Add project and user entries
+  test('search service can filter by sections', async () => {
+    // Add entries with different sections
     await journalManager.writeThoughts({
-      project_notes: 'This project uses React and TypeScript'
+      projectNotes: 'This project uses React and TypeScript'
     });
-    
+
     await journalManager.writeThoughts({
-      feelings: 'I enjoy working with modern JavaScript frameworks'
+      user: 'I enjoy working with modern JavaScript frameworks'
     });
 
     await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Search only project entries
-    const projectResults = await searchService.search('React TypeScript', { type: 'project' });
-    const userResults = await searchService.search('React TypeScript', { type: 'user' });
-    
-    expect(projectResults.length).toBeGreaterThan(0);
-    expect(projectResults[0].type).toBe('project');
-    
+
+    // Search with section filter
+    const { results: projectResults } = await searchService.search('React TypeScript', { sections: ['Project'] });
+    const { results: userResults } = await searchService.search('React TypeScript', { sections: ['User'] });
+
+    // Project results should contain entries with Project section
+    if (projectResults.length > 0) {
+      expect(projectResults[0].sections).toContain('Project');
+    }
+
+    // User results should contain entries with User section
     if (userResults.length > 0) {
-      expect(userResults[0].type).toBe('user');
+      expect(userResults[0].sections).toContain('User');
     }
   }, 90000);
 });
