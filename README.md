@@ -46,6 +46,26 @@ Add to your MCP settings (e.g., Claude Desktop configuration):
 }
 ```
 
+### Profile Isolation
+
+To use separate journals for different Claude Code profiles, set the `JOURNAL_DIR` environment variable:
+
+```json
+{
+  "mcpServers": {
+    "private-journal": {
+      "command": "npx",
+      "args": ["github:obra/private-journal-mcp"],
+      "env": {
+        "JOURNAL_DIR": "/path/to/profile-specific/journal"
+      }
+    }
+  }
+}
+```
+
+When `JOURNAL_DIR` is not set, the default location `~/.claude/.private-journal/` is used.
+
 ## Local Development Installation
 
 Use a local build to test changes:
@@ -88,6 +108,10 @@ Browse recent entries chronologically:
 - **limit**: Maximum entries (default: 10)
 - **project**: Filter by project name
 - **days**: Days back to search (default: 30)
+
+### `get_journal_config`
+Returns configured journal paths (useful for skills adapting to different journal locations):
+- Returns: `{ basePath, entriesPath, projectsPath }`
 
 ## Slash Commands
 

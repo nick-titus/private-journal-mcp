@@ -7,8 +7,10 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
+import * as path from 'path';
 import { JournalManager } from './journal.js';
 import { SearchService } from './search.js';
+import { resolveJournalBasePath, resolveEntriesPath } from './paths.js';
 
 export class PrivateJournalServer {
   private server: Server;
@@ -123,6 +125,15 @@ Write to any combination of sections. Entries are automatically tagged with the 
                 default: 30,
               },
             },
+            required: [],
+          },
+        },
+        {
+          name: 'get_journal_config',
+          description: "Returns the configured journal paths. Useful for skills that need to adapt to different journal locations (e.g., profile isolation).",
+          inputSchema: {
+            type: 'object',
+            properties: {},
             required: [],
           },
         },
@@ -268,6 +279,22 @@ Write to any combination of sections. Entries are automatically tagged with the 
           const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
           throw new Error(`Failed to list recent entries: ${errorMessage}`);
         }
+      }
+
+      if (request.params.name === 'get_journal_config') {
+        const basePath = resolveJournalBasePath();
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                basePath,
+                entriesPath: path.join(basePath, 'entries'),
+                projectsPath: path.join(basePath, 'projects'),
+              }, null, 2),
+            },
+          ],
+        };
       }
 
       throw new Error(`Unknown tool: ${request.params.name}`);

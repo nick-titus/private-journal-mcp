@@ -17,8 +17,13 @@ export function isValidPath(dirPath: string): boolean {
 
 /**
  * Returns the centralized journal storage path
+ * Checks JOURNAL_DIR env var first for profile isolation support
  */
 export function resolveJournalBasePath(): string {
+  // Allow override via environment variable for profile isolation
+  if (process.env.JOURNAL_DIR && process.env.JOURNAL_DIR.trim()) {
+    return path.resolve(process.env.JOURNAL_DIR.trim());
+  }
   const home = process.env.HOME || process.env.USERPROFILE;
   if (!home) {
     console.warn('Warning: HOME and USERPROFILE environment variables are not set. Journal data will be stored in /tmp which may be cleared on reboot.');
