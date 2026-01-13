@@ -289,7 +289,7 @@ Write to any combination of sections. Entries are automatically tagged with the 
               type: 'text',
               text: JSON.stringify({
                 basePath,
-                entriesPath: resolveEntriesPath(),
+                entriesPath: path.join(basePath, 'entries'),
                 projectsPath: path.join(basePath, 'projects'),
               }, null, 2),
             },

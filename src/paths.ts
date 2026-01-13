@@ -21,8 +21,8 @@ export function isValidPath(dirPath: string): boolean {
  */
 export function resolveJournalBasePath(): string {
   // Allow override via environment variable for profile isolation
-  if (process.env.JOURNAL_DIR) {
-    return process.env.JOURNAL_DIR;
+  if (process.env.JOURNAL_DIR && process.env.JOURNAL_DIR.trim()) {
+    return path.resolve(process.env.JOURNAL_DIR.trim());
   }
   const home = process.env.HOME || process.env.USERPROFILE;
   if (!home) {
